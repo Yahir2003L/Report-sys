@@ -1,0 +1,183 @@
+---
+export const prerender = false;
+
+import { pool } from '../lib/db';
+import type { User } from '../lib/db';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import type mysql from 'mysql2/promise';
+
+const logoutSuccess = Astro.url.searchParams.get('logout') === 'success';
+let errorMessage = '';
+
+// Verificacion si el usuario ya tiene una sesión activa
+const authToken = Astro.cookies.get('session_token')?.value;
+if (authToken) {
+  const [session] = await pool.query<mysql.RowDataPacket[]>(
+    `SELECT u.id, u.username, u.role 
+     FROM user_sessions s
+     JOIN users u ON s.user_id = u.id
+     WHERE s.token = ? AND s.expires_at > NOW()`,
+    [authToken]
+  );
+
+  if (session.length > 0) {
+    return Astro.redirect('/');
+  }
+}
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const username = formData.get('username')?.toString();
+    const password = formData.get('password')?.toString();
+
+    if (!username || !password) {
+      errorMessage = 'Usuario y contraseña son requeridos';
+    } else {
+      const [rows]: [mysql.RowDataPacket[], mysql.FieldPacket[]] = await pool.query(
+        'SELECT id, username, full_name, password, role FROM users WHERE username = ?',
+        [username]
+      );
+
+      const user = rows[0] as unknown as User | undefined;
+      
+      if (user?.password) {
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        
+        if (passwordMatch) {
+          // Creacion del token de sesion
+          const sessionToken = crypto.randomBytes(32).toString('hex');
+          const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // sesion por 30 días
+          
+          await pool.query(
+            `INSERT INTO user_sessions (token, user_id, expires_at)
+             VALUES (?, ?, ?)`,
+            [sessionToken, user.id, expiresAt]
+          );
+
+          Astro.cookies.set('session_token', sessionToken, {
+            path: '/',
+            expires: expiresAt,
+            httpOnly: true,
+            secure: import.meta.env.PROD,
+            sameSite: 'strict'
+          });
+
+          return Astro.redirect('/');
+        }
+      }
+      
+      errorMessage = 'Usuario o contraseña incorrectos';
+    }
+  } catch (error) {
+    console.error('Error en el login:', error);
+    errorMessage = 'Error al procesar el login';
+  }
+}
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+	<meta http-equiv="Pragma" content="no-cache">
+	<meta http-equiv="Expires" content="0">
+  <title>Login - Sistema Administrativo</title>
+  <style>
+    .login-container {
+      max-width: 400px;
+      margin: 2rem auto;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      background: white;
+    }
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .error-message {
+      color: #dc2626;
+      padding: 0.75rem;
+      margin-bottom: 1.5rem;
+      background: #fee2e2;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .success-message {
+    color: #16a34a;
+    background: #dcfce7;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: 4px;
+    text-align: center;
+  }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h1 style="text-align: center; margin-bottom: 1.5rem;">Iniciar Sesión</h1>
+    {logoutSuccess && (
+      <div class="success-message">
+        Sesión cerrada exitosamente
+      </div>
+    )}
+
+    {errorMessage && <div class="error-message">{errorMessage}</div>}
+    
+    <form method="POST" enctype="application/x-www-form-urlencoded">
+      <div class="form-group">
+        <label for="username">Usuario:</label>
+        <input 
+          type="text" 
+          id="username" 
+          name="username" 
+          required
+          placeholder="Ingresa tu usuario"
+        >
+      </div>
+      
+      <div class="form-group">
+        <label for="password">Contraseña:</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          required
+          placeholder="Ingresa tu contraseña"
+        >
+      </div>
+      
+      <button type="submit">Ingresar al Sistema</button>
+    </form>
+  </div>
+</body>
+</html>

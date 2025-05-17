@@ -1,0 +1,35 @@
+{
+  "name": "report-sys",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@astrojs/node": "^9.2.0",
+    "@auth/core": "^0.38.0",
+    "@lucia-auth/adapter-mysql": "^3.0.2",
+    "@lucia-auth/astro": "^0.5.7",
+    "@prisma/client": "^6.6.0",
+    "@tailwindcss/vite": "^4.1.4",
+    "astro": "^5.7.2",
+    "bcrypt": "^5.1.1",
+    "lucia": "^3.2.2",
+    "mysql2": "^3.14.0",
+    "next": "^15.3.1",
+    "node": "^23.11.0",
+    "prisma": "^6.6.0",
+    "tailwindcss": "^4.1.4"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/cookie": "^0.6.0",
+    "@types/node": "^22.14.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}

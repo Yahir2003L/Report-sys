@@ -1,0 +1,73 @@
+---
+ import './src/styles/global.css'
+ import Header from '../components/Header.astro'
+ import Footer from '../components/Footer.astro'
+ import CreateUserModal from '@/components/CreateUserModal.astro'
+ import { isSuperadmin } from '../lib/access-control';
+ import CreateReportModal from '@/components/CreateReportModal.astro';
+ 
+ interface Props{
+	user: {
+		userId: number;
+		username: string;
+		fullName: string;
+		role: 'superadmin' | 'admin' | 'user';
+		sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
+	} | null | undefined;
+	token?: string;
+ }
+
+ const { user, token } = Astro.props;
+ const isSuperAdmin = user ? isSuperadmin(user) : false;
+
+ if ( !Astro.props.user && Astro.url.pathname !== '/login' ) {
+   return Astro.redirect('/login');
+ }
+---
+
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="generator" content={Astro.generator} />
+    <title>Rolando calles agusto</title>
+    <script  is:inline src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  </head>
+  <body data-user-role={user?.role}>
+    <Header user={user} token={token} />
+ 
+
+    <div class="flex justify-between items-center px-10 py-4">
+      <h1 class="text-5xl font-semibold">INVOICES</h1>
+      <div class="flex gap-x-1">
+          {(user?.role === 'admin' || user?.role === 'user') && (
+            <CreateReportModal user={user} />
+          )}
+         
+          {user?.role === 'superadmin' && (
+          <>
+            <CreateReportModal user={user} />
+            <CreateUserModal user={user} />
+          </>
+        )}
+      </div>
+    </div>
+    <slot />
+    <Footer />
+  </body>
+</html>
+
+<style>
+  html,
+  body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+  }
+</style>

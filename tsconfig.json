@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*":[
+        "./src/*"
+      ]
+    },
+    "types": ["astro/client"],
+    "skipLibCheck": true
+  },
+
+  "extends": "astro/tsconfigs/strict"
+}

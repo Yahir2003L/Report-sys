@@ -1,0 +1,29 @@
+---
+// filepath: c:\Users\yl160\report-sys\src\pages\reportes\createReport.astro
+import { checkPermission } from "@/lib/access-control";
+
+// Obtén el usuario desde Astro.props
+const { user } = Astro.props;
+
+// Verificar permisos para crear reportes
+try {
+  checkPermission(user, 'user', 'primaria');
+} catch (error) {
+  // Verificación de tipo segura
+  if (error instanceof Error && error.message === 'ACCESS_DENIED') {
+    return new Response(null, {
+      status: 302,
+      headers: { Location: '/access-denegado' },
+    });
+  }
+  
+  // Opcional: manejar otros tipos de errores
+  console.error('Error inesperado:', error);
+  return new Response(null, {
+    status: 500,
+    headers: { Location: '/error' },
+  });
+}
+---
+<h1>Crear Reporte</h1>
+<p>Bienvenido, {user.fullName}</p>
