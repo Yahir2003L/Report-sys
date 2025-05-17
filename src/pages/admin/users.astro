@@ -1,0 +1,157 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import { getUserFromToken } from '@/lib/auth';
+import { isSuperadmin } from '@/lib/access-control';
+import { pool } from '@/lib/db';
+import mysql from 'mysql2/promise';
+import EditUserModal from '@/components/EditUserModal.astro';
+
+interface User {
+  id: number;
+  username: string;
+  full_name: string;
+  role: string;
+  sector: string;
+  is_active: boolean;
+  created_at: string;
+  created_by_name?: string;
+}
+
+const token = Astro.cookies.get('session_token')?.value;
+const currentUser = await getUserFromToken(token || "");
+
+if (!currentUser || !isSuperadmin(currentUser)) {
+  return Astro.redirect('/login');
+}
+
+async function getAllUsers(): Promise<User[]> {
+  const [rows] = await pool.query<mysql.RowDataPacket[]>(`
+    SELECT 
+      id, 
+      username, 
+      full_name, 
+      role, 
+      sector, 
+      is_active,
+      DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') as created_at,
+      (SELECT username FROM users WHERE id = u.created_by) as created_by_name
+    FROM users u
+    ORDER BY is_active DESC, role DESC, created_at DESC
+  `);
+  
+  return rows.map(row => ({
+    ...row,
+    is_active: Boolean(row.is_active)
+  })) as User[];
+}
+
+const users = await getAllUsers();
+---
+
+<Layout title="Gestión de Usuarios" user={currentUser} token={token}>
+  <main class="container mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-6">Gestión de Usuarios</h1>
+    
+    <div class="overflow-x-auto shadow rounded-lg">
+      <table class="min-w-full bg-white">
+        <thead class="bg-gray-800 text-white">
+          <tr>
+            <th class="py-3 px-4 text-left">ID</th>
+            <th class="py-3 px-4 text-left">Usuario</th>
+            <th class="py-3 px-4 text-left">Nombre</th>
+            <th class="py-3 px-4 text-left">Rol</th>
+            <th class="py-3 px-4 text-left">Sector</th>
+            <th class="py-3 px-4 text-left">Estado</th>
+            <th class="py-3 px-4 text-left">Creado por</th>
+            <th class="py-3 px-4 text-left">Fecha creación</th>
+            <th class="py-3 px-4 text-left">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {users.map(user => (
+            <tr 
+              id={`user-row-${user.id}`}
+              class="hover:bg-gray-50 transition-colors"
+            >
+              <td class="py-3 px-4 whitespace-nowrap">{user.id}</td>
+              <td class="py-3 px-4 whitespace-nowrap">{user.username}</td>
+              <td class="py-3 px-4 whitespace-nowrap">{user.full_name}</td>
+              <td class="py-3 px-4 whitespace-nowrap capitalize">{user.role}</td>
+              <td class="py-3 px-4 whitespace-nowrap capitalize">{user.sector}</td>
+              <td class="py-3 px-4 whitespace-nowrap">
+                <span class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {user.is_active ? 'Activo' : 'Inactivo'}
+                </span>
+              </td>
+              <td class="py-3 px-4 whitespace-nowrap">{user.created_by_name || 'Sistema'}</td>
+              <td class="py-3 px-4 whitespace-nowrap">{user.created_at}</td>
+              <td class="py-3 px-4 whitespace-nowrap flex gap-2">
+                <button
+                  class="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                  hx-get={`/modals/edit-user?id=${user.id}`}
+                  hx-target="#editModalContent"
+                  hx-trigger="click"
+                  onclick="document.getElementById('editModal').classList.remove('hidden')"
+                >
+                  Editar
+                </button>
+                {user.is_active ? (
+                  <button
+                    class="text-red-600 hover:text-red-800 font-medium text-sm"
+                    hx-delete={`/api/users/${user.id}`}
+                    hx-target={`#user-row-${user.id}`}
+                    hx-confirm="¿Desactivar este usuario?"
+                  >
+                    Desactivar
+                  </button>
+                ) : (
+                  <button
+                    class="text-green-600 hover:text-green-800 font-medium text-sm"
+                    hx-post={`/api/users/${user.id}`}
+                    hx-target={`#user-row-${user.id}`}
+                    hx-confirm="¿Seguro que quieres activar este usuario?"
+                    >
+                    Activar
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    
+    <div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div id="editModalContent" class="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        
+      </div>
+    </div>
+
+    <div id="loading-indicator" class="fixed top-0 left-0 right-0 h-1 bg-blue-500 opacity-0 transition-opacity duration-300 z-50"></div>
+  </main>
+
+  <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+  <script is:inline>
+
+    document.addEventListener('click', (e) => {
+      if (e.target.id === 'editModal' || e.target.closest('[data-modal-close]')) {
+        document.getElementById('editModal').classList.add('hidden');
+      }
+    });
+
+    document.body.addEventListener('htmx:afterOnLoad', (evt) => {
+      if (evt.detail.successful && evt.detail.requestConfig.verb === 'put') {
+        document.getElementById('editModal').classList.add('hidden');
+      }
+    });
+
+    document.body.addEventListener('htmx:beforeRequest', () => {
+      document.getElementById('loading-indicator').classList.remove('opacity-0');
+    });
+    document.body.addEventListener('htmx:afterRequest', () => {
+      document.getElementById('loading-indicator').classList.add('opacity-0');
+    });
+  </script>
+</Layout>

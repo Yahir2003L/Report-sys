@@ -198,10 +198,10 @@ const isSuperAdmin = user ? isSuperadmin(user) : false;
         } else {
           alert(msg);
         }
-        return; // No continuar con el submit real
+        return;
       }
 
-      // Enviar el formulario real si no hay duplicado
+
       const response = await fetch(form.action, {
         method: 'POST',
         body: new FormData(form),

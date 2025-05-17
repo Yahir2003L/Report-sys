@@ -14,7 +14,7 @@ export async function getUserFromToken(token: string) {
     SELECT u.id, u.username, u.full_name, u.role, u.sector
     FROM user_sessions s
     JOIN users u ON s.user_id = u.id
-    WHERE s.token = ? AND s.expires_at > NOW()`,
+    WHERE s.token = ? AND s.expires_at > NOW() AND u.is_active = 1`,
     [token]
   );
 
@@ -32,7 +32,7 @@ export async function getUserFromToken(token: string) {
 
 export async function login(username: string, password: string) {
   const [rows] = await pool.query<mysql.RowDataPacket[]>(`
-    SELECT id, username, password, role FROM users WHERE username = ?`,
+    SELECT id, username, password, role, full_name, sector FROM users WHERE username = ? AND is_active = 1`,
     [username]
   );
 

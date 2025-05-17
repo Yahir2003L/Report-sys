@@ -11,7 +11,9 @@ export const onRequest = sequence( async ({ request, cookies, redirect }, next) 
     const token = cookies.get('session_token')?.value || '';
     const user = token ? await getUserFromToken(token) : null;
 
-    if (!user && url.pathname !== '/login'){
+     if (!user) {
+        cookies.delete('session_token', { path: '/' });
+
         return redirect('/login');
     }
 

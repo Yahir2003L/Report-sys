@@ -15,9 +15,10 @@
 		sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
 	} | null | undefined;
 	token?: string;
+  title?: string;
  }
 
- const { user, token } = Astro.props;
+ const { user, token, title } = Astro.props;
  const isSuperAdmin = user ? isSuperadmin(user) : false;
 
  if ( !Astro.props.user && Astro.url.pathname !== '/login' ) {
@@ -36,11 +37,11 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <meta name="generator" content={Astro.generator} />
-    <title>Rolando calles agusto</title>
+    <title>{title ?? 'Sistema de Reportes'}</title>
     <script  is:inline src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   </head>
   <body data-user-role={user?.role}>
-    <Header user={user} token={token} />
+    <Header user={user} token={token}/>
  
 
     <div class="flex justify-between items-center px-10 py-4">

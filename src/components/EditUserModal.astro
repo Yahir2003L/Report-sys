@@ -1,0 +1,107 @@
+---
+// src/components/EditUserModal.astro
+const { user } = Astro.props;
+---
+
+<div class="bg-white rounded-lg p-6 max-w-md w-full">
+  <h2 class="text-xl font-bold mb-4">Editar Usuario</h2>
+  
+  <form 
+    hx-put={`/api/users/${user.id}`}
+    hx-target={`#user-row-${user.id}`}
+    hx-swap="outerHTML"
+    hx-indicator="#loading-indicator"
+    class="space-y-4"
+  >
+    <input type="hidden" name="id" value={user.id} />
+    
+    <div>
+      <label class="block text-gray-700 mb-1">Nombre de usuario</label>
+      <input 
+        type="text" 
+        name="username" 
+        value={user.username}
+        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        required
+      />
+    </div>
+    
+    <div>
+      <label class="block text-gray-700 mb-1">Nombre completo</label>
+      <input 
+        type="text" 
+        name="fullName" 
+        value={user.full_name}
+        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        required
+      />
+    </div>
+    
+    <div>
+      <label class="block text-gray-700 mb-1">Rol</label>
+      <select 
+        name="role" 
+        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="superadmin" selected={user.role === 'superadmin'}>Super Admin</option>
+        <option value="admin" selected={user.role === 'admin'}>Admin</option>
+        <option value="user" selected={user.role === 'user'}>Usuario</option>
+      </select>
+    </div>
+    
+    <div>
+      <label class="block text-gray-700 mb-1">Sector</label>
+      <select 
+        name="sector" 
+        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="primaria" selected={user.sector === 'primaria'}>Primaria</option>
+        <option value="secundaria" selected={user.sector === 'secundaria'}>Secundaria</option>
+        <option value="bachillerato" selected={user.sector === 'bachillerato'}>Bachillerato</option>
+        <option value="universidad" selected={user.sector === 'universidad'}>Universidad</option>
+      </select>
+    </div>
+    
+    <div>
+      <label class="block text-gray-700 mb-1">Nueva contraseña</label>
+      <input 
+        type="password" 
+        name="password" 
+        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        placeholder="Dejar vacío para no cambiar"
+      />
+    </div>
+    
+    <div class="flex justify-end gap-2 pt-2">
+      <button 
+        type="button" 
+        class="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+        data-modal-close
+      >
+        Cancelar
+      </button>
+      <button 
+        type="submit" 
+        class="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+      >
+        Guardar Cambios
+      </button>
+    </div>
+  </form>
+</div>
+
+<script is:inline>
+document.body.addEventListener('htmx:afterSwap', (evt) => {
+  if (evt.detail.target?.id?.startsWith('user-row-')) {
+    Swal.fire({
+      icon: 'success',
+      title: '¡Éxito!',
+      text: 'Usuario actualizado correctamente',
+      timer: 2000,
+      showConfirmButton: false
+    });
+
+    document.getElementById('editModal')?.classList.add('hidden');
+  }
+});
+</script>
