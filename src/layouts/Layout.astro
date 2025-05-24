@@ -45,7 +45,6 @@
  
 
     <div class="flex justify-between items-center px-10 py-4">
-      <h1 class="text-5xl font-semibold">INVOICES</h1>
       <div class="flex gap-x-1">
           {(user?.role === 'admin' || user?.role === 'user') && (
             <CreateReportModal user={user} />
