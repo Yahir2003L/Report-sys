@@ -59,5 +59,5 @@ export function canViewAllReports(user: UserSession | null): boolean {
 }
 
 export function canViewSectorReports(user: UserSession | null): boolean {
-  return !!user; // usuario solamente puede ver reportes de su sector
+  return !!user;
 }

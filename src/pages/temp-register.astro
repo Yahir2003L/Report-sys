@@ -1,10 +1,9 @@
 ---
-// src/pages/temp-register.astro
 import { pool } from '../lib/db';
 import mysql from 'mysql2'
 import bcrypt from 'bcrypt';
 
-// Verificar si ya existe un superadmin
+
 const [existingAdmin] = await pool.query<mysql.RowDataPacket[]>(
   "SELECT id FROM users WHERE role = 'superadmin' LIMIT 1"
 );
@@ -17,7 +16,6 @@ if (existingAdmin.length > 0) {
   message = '❌ Ya existe un superadmin en el sistema';
 }
 
-// Procesar el formulario
 if (Astro.request.method === 'POST' && showForm) {
   const formData = await Astro.request.formData();
   const username = formData.get('username')?.toString() || '';
@@ -49,7 +47,6 @@ if (Astro.request.method === 'POST' && showForm) {
 }
 ---
 
-<!-- Resto del template HTML igual que antes -->
 <html lang="es">
 <head>
   <title>Registro Temporal de Superadmin</title>
@@ -86,7 +83,5 @@ if (Astro.request.method === 'POST' && showForm) {
       <button type="submit">Crear Superadmin</button>
     </form>
   )}
-  
-  <p><small>Esta página solo debe estar disponible en entorno de desarrollo.</small></p>
 </body>
 </html>
