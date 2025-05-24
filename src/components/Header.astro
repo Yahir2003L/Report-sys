@@ -3,6 +3,7 @@ import { logout } from '../lib/auth';
 import Settings from './icons/Settings.astro';
 import User from './icons/User.astro';
 import Logout from './icons/Logout.astro';
+import UsersIcon from './icons/Users.astro';
 
 interface Props {
   user: {
@@ -21,7 +22,9 @@ const { user, token } = Astro.props;
 
 <header>
   <div class="flex justify-between items-center py-3 px-10 relative">
-    <div class="logo">Rolando</div>
+    <a href="/">
+      <div class="logo">Rolando</div>
+    </a>
     <ul class="nav-left flex items-center bg-[#1F1F23] px-5 py-1 rounded-full gap-x-5">
       <li class="px-3 py-2 text-gray-400 cursor-pointer">Primaria</li>
       <li class="px-3 py-2 text-black cursor-pointer bg-yellow-300 rounded-full">Secundaria</li>
@@ -29,6 +32,13 @@ const { user, token } = Astro.props;
       <li class="px-3 py-2 text-gray-400 cursor-pointer">Universidad</li>
     </ul>
     <ul class="nav-right flex justify-center items-center gap-x-2 relative" x-data="{ open: false }">
+      {user?.role === 'superadmin' && (
+        <li class="w-10 h-10 bg-slate-200 rounded-full flex justify-center items-center cursor-pointer">
+          <a href="/admin/users" title="Gestión de usuarios">
+            <UsersIcon class="w-5" />
+          </a>
+        </li>
+      )}
       <li class="w-10 h-10 bg-slate-200 rounded-full flex justify-center items-center cursor-pointer">
         <Settings class="w-5" />
       </li>
