@@ -82,8 +82,6 @@ const sectorNames ={
       window.location.href = `/?sector=${sector}`;
     }
   }
-
-  // Sincronizar el sector al cargar
   document.addEventListener('DOMContentLoaded', () => {
     const userRole = document.body.getAttribute('data-user-role');
     if (userRole === 'user') {
