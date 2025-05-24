@@ -6,20 +6,22 @@
  import { isSuperadmin } from '../lib/access-control';
  import CreateReportModal from '@/components/CreateReportModal.astro';
  
- interface Props{
-	user: {
-		userId: number;
-		username: string;
-		fullName: string;
-		role: 'superadmin' | 'admin' | 'user';
-		sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
-	} | null | undefined;
-	token?: string;
+interface Props {
+  user: {
+    userId: number;
+    username: string;
+    fullName: string;
+    role: 'superadmin' | 'admin' | 'user';
+    sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
+  } | null | undefined;
+  token?: string;
   title?: string;
- }
+  currentSector?: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
+}
 
- const { user, token, title } = Astro.props;
- const isSuperAdmin = user ? isSuperadmin(user) : false;
+const { user, token, title, currentSector: propSector } = Astro.props;
+const isSuperAdmin = user ? isSuperadmin(user) : false;
+const currentSector = propSector || user?.sector || 'secundaria';
 
  if ( !Astro.props.user && Astro.url.pathname !== '/login' ) {
    return Astro.redirect('/login');
@@ -41,8 +43,7 @@
     <script  is:inline src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   </head>
   <body data-user-role={user?.role}>
-    <Header user={user} token={token}/>
- 
+    <Header user={user} token={token} currentSector={currentSector} />
 
     <div class="flex justify-between items-center px-10 py-4">
       <div class="flex gap-x-1">

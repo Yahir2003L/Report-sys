@@ -125,6 +125,7 @@ export const GET: APIRoute = async ({ cookies, url }) => {
             );
         }
 
+        const sectorParam = url.searchParams.get('sector');
         const userIdParam = url.searchParams.get('user');
         
         // Validación
@@ -152,6 +153,9 @@ export const GET: APIRoute = async ({ cookies, url }) => {
         } else if (currentUser.role === 'user') {
             query += ` WHERE r.sector = ?`;
             params.push(currentUser.sector);
+        } else if (sectorParam) {
+             query += ` WHERE r.sector = ?`;
+            params.push(sectorParam);
         }
 
         query += ` ORDER BY 

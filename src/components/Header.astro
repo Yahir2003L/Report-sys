@@ -5,6 +5,8 @@ import User from './icons/User.astro';
 import Logout from './icons/Logout.astro';
 import UsersIcon from './icons/Users.astro';
 
+type Sector = 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
+
 interface Props {
   user: {
     userId: number;
@@ -14,9 +16,17 @@ interface Props {
     sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
   } | null | undefined;
   token?: string;
+  currentSector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
 }
 
-const { user, token } = Astro.props;
+const { user, token, currentSector } = Astro.props;
+const sectors = ['primaria', 'secundaria', 'bachillerato', 'universidad'];
+const sectorNames ={
+  primaria: 'primaria',
+  secundaria: 'secundaria',
+  bachillerato: 'bachillerato',
+  universidad: 'universidad',
+};
 ---
 <script src="https://unpkg.com/alpinejs" defer></script>
 
@@ -25,11 +35,19 @@ const { user, token } = Astro.props;
     <a href="/">
       <div class="logo">Rolando</div>
     </a>
-    <ul class="nav-left flex items-center bg-[#1F1F23] px-5 py-1 rounded-full gap-x-5">
-      <li class="px-3 py-2 text-gray-400 cursor-pointer">Primaria</li>
-      <li class="px-3 py-2 text-black cursor-pointer bg-yellow-300 rounded-full">Secundaria</li>
-      <li class="px-3 py-2 text-gray-400 cursor-pointer">Preparatoria</li>
-      <li class="px-3 py-2 text-gray-400 cursor-pointer">Universidad</li>
+      <ul class="nav-left flex items-center bg-[#1F1F23] px-5 py-1 rounded-full gap-x-5">
+      {sectors.map(sector => (
+  <li 
+    class={`px-3 py-2 cursor-pointer rounded-full transition-colors ${
+      currentSector === sector 
+        ? 'text-black bg-yellow-300' 
+        : 'text-gray-400 hover:text-gray-300'
+    }`}
+    onclick={`handleSectorClick('${sector as Sector}')`}
+  >
+    {sectorNames[sector as Sector]}
+  </li>
+))}
     </ul>
     <ul class="nav-right flex justify-center items-center gap-x-2 relative" x-data="{ open: false }">
       {user?.role === 'superadmin' && (
@@ -39,9 +57,6 @@ const { user, token } = Astro.props;
           </a>
         </li>
       )}
-      <li class="w-10 h-10 bg-slate-200 rounded-full flex justify-center items-center cursor-pointer">
-        <Settings class="w-5" />
-      </li>
       <li @click="open = !open" class="w-10 h-10 bg-slate-200 rounded-full flex justify-center items-center cursor-pointer relative">
         <User class="w-5" />
         <!-- Dropdown -->
@@ -58,6 +73,26 @@ const { user, token } = Astro.props;
     </ul>
   </div>
 </header>
+
+<script is:inline>
+  function handleSectorClick(sector) {
+    const userRole = document.body.getAttribute('data-user-role');
+    if (userRole === 'superadmin' || userRole === 'admin') {
+      localStorage.setItem('selectedSector', sector);
+      window.location.href = `/?sector=${sector}`;
+    }
+  }
+
+  // Sincronizar el sector al cargar
+  document.addEventListener('DOMContentLoaded', () => {
+    const userRole = document.body.getAttribute('data-user-role');
+    if (userRole === 'user') {
+      document.querySelectorAll('.nav-left li').forEach(li => {
+        li.style.pointerEvents = 'none';
+      });
+    }
+  });
+</script>
 
 <!-- {user && (
   <div class="user-section">
