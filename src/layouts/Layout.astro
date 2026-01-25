@@ -1,10 +1,17 @@
 ---
- import '../styles/global.css'
- import Header from '../components/Header.astro'
- import Footer from '../components/Footer.astro'
- import CreateUserModal from '@/components/CreateUserModal.astro'
- import { isSuperadmin } from '../lib/access-control';
- import CreateReportModal from '@/components/CreateReportModal.astro';
+  import '../styles/global.css'
+  import Header from '../components/Header.astro'
+  import Footer from '../components/Footer.astro'
+  import CreateUserModal from '@/components/CreateUserModal.astro'
+  import { isSuperadmin } from '../lib/access-control';
+  import CreateReportModal from '@/components/CreateReportModal.astro';
+  import Logout from '@/components/icons/Logout.astro';
+  import Bachillerato from '@/components/icons/Bachillerato.astro';
+  import Home from '@/components/icons/Home.astro';
+  import Primaria from '@/components/icons/Primaria.astro';
+  import Secundaria from '@/components/icons/Secundaria.astro';
+  import Universidad from '@/components/icons/Universidad.astro';
+  import Users from '@/components/icons/Users.astro';
  
 interface Props {
   user: {
@@ -42,23 +49,36 @@ const currentSector = propSector || user?.sector || 'secundaria';
     <title>{title ?? 'Sistema de Reportes'}</title>
     <script  is:inline src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   </head>
-  <body data-user-role={user?.role}>
-    <Header user={user} token={token} currentSector={currentSector} />
-
-    <div class="flex justify-between items-center px-10 py-4">
-      <div class="flex gap-x-1">
-          {(user?.role === 'admin' || user?.role === 'user') && (
-            <CreateReportModal user={user} />
-          )}
-         
-          {user?.role === 'superadmin' && (
-          <>
-            <CreateReportModal user={user} />
-            <CreateUserModal user={user} />
-          </>
-        )}
+  <body data-user-role={user?.role} class="flex">
+    <div class="flex justify-between flex-col px-3 py-5 shadow-md w-1/4 h-screen">
+      <div class="flex flex-col gap-y-10">
+        <a>LOGO</a>
+        <div class="flex flex-col gap-y-5">
+          <a href="" class="flex gap-x-3"><Home/>Inicio</a>
+          <a href="" class="flex gap-x-3"><Primaria/>Primaria</a>
+          <a href="" class="flex gap-x-3"><Secundaria/>Secundaria</a>
+          <a href="" class="flex gap-x-3"><Bachillerato/>Bachillerato</a>
+          <a href="" class="flex gap-x-3"><Universidad/>Universidad</a>
+          <a href="" class="flex gap-x-3"><Users/>Usuarios</a>
+        </div>
+      </div>
+      <div>
+        <div>
+          <form method="POST" action="/api/logout">
+            <input type="hidden" name="token" value={Astro.cookies.get('session_token')?.value} />
+            <button type="submit" class="flex items-center gap-x-2 cursor-pointer">
+              <Logout class="w-5"/>
+              Cerrar sesión
+            </button>
+          </form>
+          <a href="">
+            <span>{user?.fullName}</span>
+            <span>{user?.role} - {user?.sector}</span>
+          </a>
+        </div>
       </div>
     </div>
+
     <slot />
     <Footer />
   </body>
