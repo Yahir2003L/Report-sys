@@ -1,0 +1,774 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getUserFromToken } from '../lib/auth';
+import { isSuperadmin} from '../lib/access-control';
+import Plus from '@/components/icons/Plus.astro';
+import Check from '@/components/icons/Check.astro';
+
+interface Report {
+  id: number;
+  classroom: string;
+  problem_type: 'red' | 'telefonico' | 'proyector' | 'pantalla' | 'electrico' | 'general';
+  priority: 'alta' | 'media' | 'baja';
+  description: string;
+  status: 'pendiente' | 'en_proceso' | 'resuelto'; 
+  sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
+  created_at: string;
+  created_by: number;
+  created_by_name: string;
+}
+
+interface User {
+  userId: number;
+  username: string;
+  fullName: string;
+  role: 'superadmin' | 'admin' | 'user';
+  sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
+}
+
+const token = Astro.cookies.get('session_token')?.value;
+const user = token ? await getUserFromToken(token) : null;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+// Verificar que el usuario tiene acceso a primaria
+const userCanViewPrimaria = user.role === 'superadmin' || user.role === 'admin' || user.sector === 'primaria';
+
+if (!userCanViewPrimaria) {
+  return Astro.redirect('/');
+}
+
+// Obtener reportes del sector primaria
+let reports: Report[] = [];
+let filteredReports: Report[] = [];
+
+try {
+  const url = Astro.url;
+  const searchParams = new URLSearchParams(url.search);
+  
+  const apiUrl = `${Astro.url.origin}/api/reports?sector=primaria`;
+  const response = await fetch(apiUrl, {
+    headers: {
+      'Cookie': `session_token=${token}`
+    }
+  });
+  
+  if (response.ok) {
+    const allReportsFromAPI: Report[] = await response.json();
+    reports = allReportsFromAPI.filter(report => report.sector === 'primaria');
+    filteredReports = [...reports];
+    
+    // Obtener nombres de creadores
+    const usersResponse = await fetch(Astro.url.origin + '/api/users', {
+      headers: {
+        'Cookie': `session_token=${token}`
+      }
+    });
+    
+    if (usersResponse.ok) {
+      const users = await usersResponse.json();
+      const userMap = new Map();
+      users.forEach((u: any) => {
+        userMap.set(u.id, u.full_name);
+      });
+      
+      reports.forEach(report => {
+        report.created_by_name = userMap.get(report.created_by) || 'Usuario desconocido';
+      });
+      
+      filteredReports = [...reports];
+    }
+  }
+} catch (err) {
+  console.error('Error al obtener reportes:', err);
+}
+
+reports.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+filteredReports.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+const reportsJson = JSON.stringify(reports);
+---
+
+<Layout user={user}>
+  <div class="h-screen bg-gray-50 p-4 md:p-6 lg:p-8 w-screen flex flex-col overflow-y-auto">
+    <!-- Header -->
+    <div class="mb-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Reportes de Primaria</h1>
+            <p class="text-gray-600 mt-2">Gestiona los reportes del sector primaria</p>
+        </div>
+            {(user.role === 'admin' || user.role === 'superadmin') && (
+                <button
+                    onclick="document.getElementById('createReportModal').classList.remove('hidden')"
+                    class="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors flex items-center gap-x-2 cursor-pointer"
+                >
+                    <Plus class="w-4 h-4" />
+                    Crear Reporte
+                </button>
+                )}
+    </div>
+
+    <div class="mb-6 flex items-center gap-x-4 bg-white px-4 py-5 rounded-lg shadow">
+      <!-- Barra de búsqueda -->
+        <div class="flex items-center gap-x-4 w-full">
+            <div class="relative flex-1">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                </div>
+                <input 
+                type="search" 
+                id="searchInput"
+                placeholder="Buscar reportes..." 
+                class="block w-full pl-10 pr-3 py-2.5 bg-gray-100 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                />
+            </div>
+            <!-- Filtros -->
+            <div class="flex items-center gap-x-3">
+                <select id="statusFilter" class="px-4 py-2.5 w-[35rem] rounded-lg bg-gray-100 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500">
+                <option value="todos">Todos los estados</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="en_proceso">En Proceso</option>
+                <option value="resuelto">Resuelto</option>
+                </select>
+
+                <select id="priorityFilter" class="px-4 py-2.5 w-[35rem] bg-gray-100 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500">
+                <option value="todas">Todas las prioridades</option>
+                <option value="alta">Alta</option>
+                <option value="media">Media</option>
+                <option value="baja">Baja</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Reportes -->
+    <div id="reportsContainer" class="space-y-6 flex-1 overflow-y-auto">
+      {filteredReports.length > 0 ? filteredReports.map((report) => (
+        <!-- Tarjeta de Reporte -->
+        <div 
+          class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+          data-status={report.status}
+          data-priority={report.priority}
+          data-report-id={report.id}
+        >
+          <div class="p-6">
+            <!-- Header de la tarjeta -->
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-1">{report.description.substring(0, 60)}{report.description.length > 60 ? '...' : ''}</h3>
+                <div class="flex items-center space-x-3">
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    Aula {report.classroom}
+                  </span>
+                  <span class={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    report.problem_type === 'red' ? 'bg-purple-100 text-purple-800' :
+                    report.problem_type === 'telefonico' ? 'bg-indigo-100 text-indigo-800' :
+                    report.problem_type === 'proyector' ? 'bg-pink-100 text-pink-800' :
+                    report.problem_type === 'pantalla' ? 'bg-cyan-100 text-cyan-800' :
+                    report.problem_type === 'electrico' ? 'bg-amber-100 text-amber-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {report.problem_type === 'red' ? 'Problema de Red' :
+                     report.problem_type === 'telefonico' ? 'Problema Telefónico' :
+                     report.problem_type === 'proyector' ? 'Problema con Proyector' :
+                     report.problem_type === 'pantalla' ? 'Problema con Pantalla' :
+                     report.problem_type === 'electrico' ? 'Problema Eléctrico' : 'Problema General'}
+                  </span>
+                </div>
+              </div>
+              
+              <div class="flex flex-col items-end space-y-2">
+                <!-- Prioridad -->
+                <span class={`px-3 py-1 rounded-full text-sm font-medium ${
+                  report.priority === 'alta' ? 'bg-red-100 text-red-800 border border-red-200' :
+                  report.priority === 'media' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                  'bg-green-100 text-green-800 border border-green-200'
+                }`}>
+                  {report.priority === 'alta' ? 'Alta' :
+                   report.priority === 'media' ? 'Media' : 'Baja'}
+                </span>
+                
+                <!-- Estado -->
+                <span class={`px-3 py-1 rounded-full text-sm font-medium ${
+                  report.status === 'pendiente' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                  report.status === 'en_proceso' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                  'bg-green-100 text-green-800 border border-green-200'
+                }`}>
+                  {report.status === 'pendiente' ? 'Pendiente' :
+                   report.status === 'en_proceso' ? 'En Proceso' : 'Resuelto'}
+                </span>
+              </div>
+            </div>
+
+            
+            <p class="text-gray-700 mb-4">{report.description || 'Sin descripción'}</p>
+
+
+            <div class="flex justify-between items-center pt-4 border-t border-gray-100">
+              <div class="text-sm text-gray-500">
+                <p>Creado por: <span class="font-medium">{report.created_by_name || 'Usuario'}</span></p>
+                <p>{new Date(report.created_at).toLocaleDateString('es-ES', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}</p>
+              </div>
+
+
+              {(user.role === 'admin' || user.role === 'superadmin') && report.status !== 'resuelto' && (
+                <button
+                  onclick={`openResolveModal(${report.id}, "${report.description.replace(/"/g, '&quot;').replace(/'/g, "\\'")}")`}
+                  class="px-4 py-2 flex items-center gap-x-2 bg-black text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+                >
+                    <Check class="w-4 h-4" />
+                  Resolver
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )) : (
+        <div class="text-center py-16 bg-white rounded-xl shadow">
+          <svg class="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <h3 class="mt-4 text-lg font-medium text-gray-900">No hay reportes</h3>
+          <p class="mt-1 text-gray-500">No se encontraron reportes para el sector primaria.</p>
+        </div>
+      )}
+    </div>
+  </div>
+
+  <!-- Modal -->
+  {(user.role === 'admin' || user.role === 'superadmin') && (
+    <div id="resolveModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="fixed inset-0 bg-black bg-opacity-50"></div>
+      <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg">
+          <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">Resolver Reporte</h3>
+              <button
+                onclick="document.getElementById('resolveModal').classList.add('hidden')"
+                class="text-gray-400 hover:text-gray-500"
+              >
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+              <h4 class="font-medium text-gray-900 mb-2" id="resolveReportTitle"></h4>
+              <p class="text-gray-700" id="resolveReportDescription"></p>
+            </div>
+
+            <form id="resolveForm" method="POST" action="/api/reports/resolve" class="space-y-4">
+              <input type="hidden" id="reportId" name="reportId" />
+              
+              <div>
+                <label for="resolutionNotes" class="block text-sm font-medium text-gray-700 mb-1">
+                  Descripción de la resolución *
+                </label>
+                <textarea 
+                  id="resolutionNotes" 
+                  name="resolutionNotes"
+                  rows="4"
+                  placeholder="Describe brevemente qué se hizo para resolver este reporte..."
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  minlength="20"
+                  required
+                ></textarea>
+                <p class="mt-1 text-sm text-gray-500">
+                  Este campo es obligatorio antes de poder marcar el reporte como resuelto (mínimo 20 caracteres)
+                </p>
+                <div id="charCount" class="text-sm text-gray-500 mt-1">0 caracteres</div>
+              </div>
+
+              <div class="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onclick="document.getElementById('resolveModal').classList.add('hidden')"
+                  class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  id="resolveSubmitBtn"
+                  class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled
+                >
+                  Marcar como Resuelto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Modal para Crear Reporte -->
+  {(user.role === 'admin' || user.role === 'superadmin') && (
+    <div id="createReportModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="fixed inset-0 bg-black bg-opacity-50"></div>
+      <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg">
+          <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">Crear Nuevo Reporte - Primaria</h3>
+              <button
+                onclick="document.getElementById('createReportModal').classList.add('hidden')"
+                class="text-gray-400 hover:text-gray-500"
+              >
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form id="createReportForm" method="POST" action="/api/reports" class="space-y-4">
+              <div>
+                <label for="classroom" class="block text-sm font-medium text-gray-700 mb-1">
+                  Aula *
+                </label>
+                <input 
+                  type="text" 
+                  id="classroom" 
+                  name="classroom"
+                  placeholder="Ej: Aula 105"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label for="problemType" class="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo de Problema *
+                </label>
+                <select 
+                  id="problemType" 
+                  name="problemType"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  required
+                >
+                  <option value="">Selecciona un tipo</option>
+                  <option value="red">Problema de Red</option>
+                  <option value="telefonico">Problema Telefónico</option>
+                  <option value="proyector">Problema con Proyector</option>
+                  <option value="pantalla">Problema con Pantalla</option>
+                  <option value="electrico">Problema Eléctrico</option>
+                  <option value="general">Problema General</option>
+                </select>
+              </div>
+
+           
+              <input type="hidden" name="sector" value="primaria" />
+
+             
+              <div>
+                <label for="priority" class="block text-sm font-medium text-gray-700 mb-1">
+                  Prioridad *
+                </label>
+                <select 
+                  id="priority" 
+                  name="priority"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  required
+                >
+                  <option value="">Selecciona prioridad</option>
+                  <option value="alta">Alta</option>
+                  <option value="media">Media</option>
+                  <option value="baja">Baja</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 mb-1">
+                  Descripción *
+                </label>
+                <textarea 
+                  id="description" 
+                  name="description"
+                  rows="3"
+                  placeholder="Describe el problema en detalle..."
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  required
+                ></textarea>
+              </div>
+
+              <div class="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onclick="document.getElementById('createReportModal').classList.add('hidden')"
+                  class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Crear Reporte
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+
+  <div id="reportsData" data-reports={reportsJson} style="display: none;"></div>
+  <div id="userData" data-role={user.role} style="display: none;"></div>
+
+
+   <script is:inline>
+  const reportsDataElement = document.getElementById('reportsData');
+  const allReports = reportsDataElement ? JSON.parse(reportsDataElement.dataset.reports) : [];
+  let filteredReports = [...allReports];
+  
+
+  const userDataElement = document.getElementById('userData');
+  const user = userDataElement ? {
+    role: userDataElement.dataset.role
+  } : { role: 'user' };
+
+  function initializeFilters() {
+  
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const priorityFilter = document.getElementById('priorityFilter');
+    const resetFiltersBtn = document.getElementById('resetFilters');
+    const reportsContainer = document.getElementById('reportsContainer');
+    
+  
+    if (!searchInput || !statusFilter || !priorityFilter || !reportsContainer) {
+      console.error('Elementos del DOM no encontrados');
+      return;
+    }
+    
+    console.log('Filtros inicializados correctamente');
+
+
+    function filterReports() {
+      const searchTerm = searchInput.value.toLowerCase();
+      const status = statusFilter.value;
+      const priority = priorityFilter.value;
+
+      filteredReports = allReports.filter(report => {
+       
+        const matchesSearch = searchTerm === '' || 
+          (report.description && report.description.toLowerCase().includes(searchTerm)) ||
+          (report.classroom && report.classroom.toLowerCase().includes(searchTerm)) ||
+          (report.created_by_name && report.created_by_name.toLowerCase().includes(searchTerm));
+
+      
+        const matchesStatus = status === 'todos' || report.status === status;
+
+        const matchesPriority = priority === 'todas' || report.priority === priority;
+
+        return matchesSearch && matchesStatus && matchesPriority;
+      });
+
+      updateReportsDisplay();
+    }
+
+    function updateReportsDisplay() {
+      if (filteredReports.length === 0) {
+        reportsContainer.innerHTML = `
+          <div class="text-center py-16 bg-white rounded-xl shadow">
+            <svg class="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 class="mt-4 text-lg font-medium text-gray-900">No se encontraron reportes</h3>
+            <p class="mt-1 text-gray-500">Intenta con otros términos de búsqueda o filtros.</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      filteredReports.forEach(report => {
+        const description = report.description || 'Sin descripción';
+        const safeDescription = description.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+        const userCanResolve = (user.role === 'admin' || user.role === 'superadmin') && report.status !== 'resuelto';
+        
+        html += `
+          <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+            <div class="p-6">
+              <div class="flex justify-between items-start mb-4">
+                <div>
+                  <h3 class="text-xl font-semibold text-gray-900 mb-1">
+                    ${description.substring(0, 60)}${description.length > 60 ? '...' : ''}
+                  </h3>
+                  <div class="flex items-center space-x-3">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                      Aula ${report.classroom}
+                    </span>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getProblemTypeClass(report.problem_type)}">
+                      ${getProblemTypeText(report.problem_type)}
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="flex flex-col items-end space-y-2">
+                  <span class="px-3 py-1 rounded-full text-sm font-medium ${getPriorityClass(report.priority)}">
+                    ${getPriorityText(report.priority)}
+                  </span>
+                  <span class="px-3 py-1 rounded-full text-sm font-medium ${getStatusClass(report.status)}">
+                    ${getStatusText(report.status)}
+                  </span>
+                </div>
+              </div>
+
+              <p class="text-gray-700 mb-4">${description}</p>
+
+              <div class="flex justify-between items-center pt-4 border-t border-gray-100">
+                <div class="text-sm text-gray-500 flex items-center space-x-2">
+                  <p>Creado por: <span class="font-medium">${report.created_by_name || 'Usuario'}</span> -</p>
+                  <p>${new Date(report.created_at).toLocaleDateString('es-ES', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}</p>
+                </div>
+
+                ${userCanResolve ? `
+                  <button
+                    onclick="window.openResolveModal(${report.id}, '${safeDescription}')"
+                    class="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors flex items-center gap-x-2 cursor-pointer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-icon lucide-circle-check"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                    Resolver
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      reportsContainer.innerHTML = html;
+    }
+
+  
+    function getProblemTypeClass(type) {
+      const classes = {
+        'red': 'bg-purple-100 text-purple-800',
+        'telefonico': 'bg-indigo-100 text-indigo-800',
+        'proyector': 'bg-pink-100 text-pink-800',
+        'pantalla': 'bg-cyan-100 text-cyan-800',
+        'electrico': 'bg-amber-100 text-amber-800',
+        'general': 'bg-gray-100 text-gray-800'
+      };
+      return classes[type] || classes['general'];
+    }
+
+    function getProblemTypeText(type) {
+      const texts = {
+        'red': 'Problema de Red',
+        'telefonico': 'Problema Telefónico',
+        'proyector': 'Problema con Proyector',
+        'pantalla': 'Problema con Pantalla',
+        'electrico': 'Problema Eléctrico',
+        'general': 'Problema General'
+      };
+      return texts[type] || 'Problema General';
+    }
+
+    function getPriorityClass(priority) {
+      const classes = {
+        'alta': 'bg-red-100 text-red-800 border border-red-200',
+        'media': 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+        'baja': 'bg-green-100 text-green-800 border border-green-200'
+      };
+      return classes[priority] || classes['baja'];
+    }
+
+    function getPriorityText(priority) {
+      const texts = {
+        'alta': 'Alta',
+        'media': 'Media',
+        'baja': 'Baja'
+      };
+      return texts[priority] || 'Baja';
+    }
+
+    function getStatusClass(status) {
+      const classes = {
+        'pendiente': 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+        'en_proceso': 'bg-blue-100 text-blue-800 border border-blue-200',
+        'resuelto': 'bg-green-100 text-green-800 border border-green-200'
+      };
+      return classes[status] || classes['pendiente'];
+    }
+
+    function getStatusText(status) {
+      const texts = {
+        'pendiente': 'Pendiente',
+        'en_proceso': 'En Proceso',
+        'resuelto': 'Resuelto'
+      };
+      return texts[status] || 'Pendiente';
+    }
+
+ 
+    searchInput.addEventListener('input', filterReports);
+    statusFilter.addEventListener('change', filterReports);
+    priorityFilter.addEventListener('change', filterReports);
+    
+    if (resetFiltersBtn) {
+      resetFiltersBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        statusFilter.value = 'todos';
+        priorityFilter.value = 'todas';
+        filterReports();
+      });
+    }
+  
+    filterReports();
+  }
+
+
+  const resolveForm = document.getElementById('resolveForm');
+  const resolutionNotes = document.getElementById('resolutionNotes');
+  const charCount = document.getElementById('charCount');
+  const resolveSubmitBtn = document.getElementById('resolveSubmitBtn');
+
+  window.openResolveModal = function(reportId, description) {
+    const report = allReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    document.getElementById('reportId').value = reportId;
+    document.getElementById('resolveReportTitle').textContent = description.substring(0, 60) + (description.length > 60 ? '...' : '');
+    document.getElementById('resolveReportDescription').textContent = report.description || 'Sin descripción';
+    document.getElementById('resolveModal').classList.remove('hidden');
+    
+
+    if (resolutionNotes) {
+      resolutionNotes.value = '';
+      charCount.textContent = '0 caracteres';
+      resolveSubmitBtn.disabled = true;
+    }
+  }
+
+  if (resolutionNotes) {
+    resolutionNotes.addEventListener('input', function() {
+      const length = this.value.length;
+      charCount.textContent = `${length} caracteres`;
+      resolveSubmitBtn.disabled = length < 20;
+    });
+  }
+
+  if (resolveForm) {
+    resolveForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const reportId = document.getElementById('reportId').value;
+      const resolutionNotes = document.getElementById('resolutionNotes').value;
+      
+      if (resolutionNotes.length < 20) {
+        alert('La descripción de la resolución debe tener al menos 20 caracteres');
+        return;
+      }
+
+      const submitBtn = resolveForm.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Resolviendo...';
+
+      try {
+        const response = await fetch('/api/reports', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reportId: parseInt(reportId),
+            newStatus: 'resuelto',
+            resolutionNotes: resolutionNotes
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          alert(result.message || 'Reporte resuelto exitosamente');
+          
+      
+          document.getElementById('resolveModal').classList.add('hidden');
+          window.location.reload();
+        } else {
+          const error = await response.json();
+          throw new Error(error.message || 'Error al resolver el reporte');
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    });
+  }
+
+  if (document.getElementById('createReportForm')) {
+    document.getElementById('createReportForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const form = e.target;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      
+     
+      const classroom = form.classroom.value.trim();
+      const problemType = form.problemType.value;
+      const description = form.description.value.trim();
+      const priority = form.priority.value;
+      
+      if (!classroom || !problemType || !description || !priority) {
+        alert('Por favor completa todos los campos obligatorios');
+        return;
+      }
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creando...';
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form)
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          alert(result.message || 'Reporte creado exitosamente');
+         
+          document.getElementById('createReportModal').classList.add('hidden');
+          form.reset();
+          window.location.reload();
+        } else {
+          const error = await response.json();
+          throw new Error(error.message || 'Error al crear el reporte');
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeFilters);
+  } else {
+    initializeFilters();
+  }
+</script>
+  
+</Layout>

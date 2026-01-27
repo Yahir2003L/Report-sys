@@ -1,0 +1,96 @@
+---
+interface Props {
+  user: {
+    userId: number;
+    username: string;
+    fullName: string;
+    role: 'superadmin' | 'admin' | 'user';
+    sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
+  } | null | undefined;
+  token?: string;
+  currentSector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
+}
+
+const { user } = Astro.props;
+
+import Home from './icons/Home.astro';
+import Users from './icons/Users.astro';
+import Secundaria from './icons/Secundaria.astro';
+import Primaria from './icons/Primaria.astro';
+import Bachillerato from './icons/Bachillerato.astro';
+import Universidad from './icons/Universidad.astro';
+
+const showAllSectors = user?.role === 'superadmin' || user?.role === 'admin';
+const showUsersLink = user?.role === 'superadmin';
+const userSector = user?.sector;
+
+---
+
+<div class="flex flex-col justify-between px-4 py-6 w-[220px] h-screen flex-shrink-0 shadow-md">
+  <div class="flex flex-col gap-y-6">
+
+    <a href="/" class="text-lg font-bold text-gray-800 px-2">Sistema de Reportes</a>
+    
+    <nav class="flex flex-col gap-y-1">
+      <a href="/" class="flex items-center gap-x-2 px-3 py-2.5 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-sm">
+        <Home class="w-4 h-4" />
+        Inicio
+      </a>
+      
+      {showAllSectors ? (
+        <>
+          <a href="/primaria" class="flex items-center gap-x-2 px-3 py-2.5 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-sm">
+            <Primaria class="w-4 h-4" />
+            Primaria
+          </a>
+          <a href="/secundaria" class="flex items-center gap-x-2 px-3 py-2.5 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-sm">
+            <Secundaria class="w-4 h-4" />
+            Secundaria
+          </a>
+          <a href="/bachillerato" class="flex items-center gap-x-2 px-3 py-2.5 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-sm">
+            <Bachillerato class="w-4 h-4" />
+            Bachillerato
+          </a>
+          <a href="/universidad" class="flex items-center gap-x-2 px-3 py-2.5 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-sm">
+            <Universidad class="w-4 h-4" />
+            Universidad
+          </a>
+        </>
+      ) : userSector && (
+        <a href={`/${userSector}`} class="flex items-center gap-x-2 px-3 py-2.5 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-sm">
+          {userSector === 'primaria' ? <Primaria class="w-4 h-4" /> :
+           userSector === 'secundaria' ? <Secundaria class="w-4 h-4" /> :
+           userSector === 'bachillerato' ? <Bachillerato class="w-4 h-4" /> :
+           <Universidad class="w-4 h-4" />}
+          {userSector.charAt(0).toUpperCase() + userSector.slice(1)}
+        </a>
+      )}
+      
+      {showUsersLink && (
+        <a href="/usuarios" class="flex items-center gap-x-2 px-3 py-2.5 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-sm">
+          <Users class="w-4 h-4" />
+          Usuarios
+        </a>
+      )}
+    </nav>
+  </div>
+
+  <div class="border-t border-gray-200 pt-4">
+    <div class="mb-4 px-2">
+      <div class="font-medium text-gray-900 text-sm">{user?.fullName || "Super Admin"}</div>
+      <div class="text-xs text-gray-500 mt-0.5">{user?.role || "Super Admin"}</div>
+      <div class="text-xs text-gray-500">{user?.sector ? user.sector.charAt(0).toUpperCase() + user.sector.slice(1) : ""}</div>
+    </div>
+    <div class="px-2">
+      <form method="POST" action="/api/logout" class="w-full">
+        <input type="hidden" name="token" value={Astro.cookies.get('session_token')?.value} />
+        <button type="submit" class="flex bg-red-600 text-white items-center gap-x-2 px-3 py-2 w-full rounded-lg transition-colors cursor-pointer text-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+          </svg>
+          Cerrar sesión
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

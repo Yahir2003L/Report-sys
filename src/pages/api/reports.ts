@@ -140,10 +140,12 @@ export const GET: APIRoute = async ({ cookies, url }) => {
         let query = `
             SELECT r.id, r.classroom, r.problem_type, r.description, 
             r.status, r.priority, r.sector, r.created_at, 
-            r.created_by,           
-            u.full_name as created_by_name
+            r.created_by, r.resolved_at, r.resolved_by, r.resolution_notes,
+            u.full_name as created_by_name,
+            u_resolved.full_name as resolved_by_name
             FROM reports r
             JOIN users u ON r.created_by = u.id
+            LEFT JOIN users u_resolved ON r.resolved_by = u_resolved.id
         `;
         let params: (string | number)[] = [];
 
@@ -256,32 +258,82 @@ export const PATCH: APIRoute = async ({ request, cookies }) => {
             );
         }
 
-
-        if (currentUser.role !== 'superadmin' && currentUser.role !== 'admin') {
+        if (currentUser.role !== 'admin' && currentUser.role !== 'superadmin') {
             return new Response(
                 JSON.stringify({ message: 'No tienes permiso para esta acción' }),
                 { status: 403 }
             );
         }
 
-        const { reportId, newStatus } = await request.json();
-        
-        if (!['pendiente', 'en_proceso', 'resuelto'].includes(newStatus)) {
+        const data = await request.json();
+        const reportId = data.reportId;
+        const newStatus = data.newStatus;
+        const resolutionNotes = data.resolutionNotes;
+
+
+        if (newStatus === 'resuelto') {
+            if (!resolutionNotes || resolutionNotes.length < 20) {
+                return new Response(
+                    JSON.stringify({ message: 'Las notas de resolución deben tener al menos 20 caracteres' }),
+                    { status: 400 }
+                );
+            }
+
+            // Verificar que el reporte existe y no está resuelto
+            const [existingReport] = await pool.query<mysql.RowDataPacket[]>(
+                'SELECT id, status FROM reports WHERE id = ?',
+                [reportId]
+            );
+
+            if (existingReport.length === 0) {
+                return new Response(
+                    JSON.stringify({ message: 'Reporte no encontrado' }),
+                    { status: 404 }
+                );
+            }
+
+            if (existingReport[0].status === 'resuelto') {
+                return new Response(
+                    JSON.stringify({ message: 'Este reporte ya está resuelto' }),
+                    { status: 400 }
+                );
+            }
+
+            await pool.query(
+                `UPDATE reports 
+                SET status = 'resuelto',
+                    resolved_at = NOW(),
+                    resolved_by = ?,
+                    resolution_notes = ?
+                WHERE id = ?`,
+                [currentUser.userId, resolutionNotes, reportId]
+            );
+
+            return new Response(
+                JSON.stringify({ 
+                    message: 'Reporte marcado como resuelto exitosamente',
+                    reportId: reportId
+                }),
+                { status: 200 }
+            );
+        }
+
+        else if (['pendiente', 'en_proceso'].includes(newStatus)) {
+            await pool.query(
+                'UPDATE reports SET status = ? WHERE id = ?',
+                [newStatus, reportId]
+            );
+
+            return new Response(
+                JSON.stringify({ message: 'Estado del reporte actualizado' }),
+                { status: 200 }
+            );
+        } else {
             return new Response(
                 JSON.stringify({ message: 'Estado no válido' }),
                 { status: 400 }
             );
         }
-
-        await pool.query(
-            'UPDATE reports SET status = ? WHERE id = ?',
-            [newStatus, reportId]
-        );
-
-        return new Response(
-            JSON.stringify({ message: 'Estado del reporte actualizado' }),
-            { status: 200 }
-        );
 
     } catch (err) {
         console.error('Error al actualizar reporte:', err);
@@ -291,3 +343,4 @@ export const PATCH: APIRoute = async ({ request, cookies }) => {
         );
     }
 };
+
