@@ -318,7 +318,7 @@ const reportsJson = JSON.stringify(reports);
     <div id="createReportModal" class="hidden fixed inset-0 z-10 overflow-y-auto" onclick="closeCreateModal()">
       <div class="modal-overlay fixed inset-0 bg-black/80"></div>
       <div class="flex min-h-full items-center justify-center p-4 relative z-50">
-        <div class="relative modal-content bg-white rounded-lg shadow-xl w-full max-w-lg">
+        <div class="relative modal-content bg-white rounded-lg shadow-xl w-full max-w-lg" onclick="event.stopPropagation()">
           <div class="p-6">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-lg font-semibold text-gray-900">Crear Nuevo Reporte - Primaria</h3>
