@@ -1,12 +1,16 @@
 ---
+import Report from '@/components/icons/Report.astro';
 import Layout from '../layouts/Layout.astro';
 import { getUserFromToken } from '../lib/auth';
+import { ClientRouter } from 'astro:transitions';
+import Clock from '@/components/icons/Clock.astro';
+import Check from '@/components/icons/Check.astro';
 
 interface Report {
   id: number;
   classroom: string;
   problem_type: 'red' | 'telefonico' | 'proyector' | 'pantalla' | 'electrico' | 'general';
-  priority: 'alta' | 'media' | 'baja' | 'urgente';
+  priority: 'alta' | 'media' | 'baja';
   description: string;
   status: 'pendiente' | 'en_proceso' | 'resuelto'; 
   sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
@@ -19,7 +23,6 @@ interface Stats {
   total: number;
   pendientes: number;
   resueltos: number;
-  urgentes: number;
   bySector: {
     primaria: number;
     secundaria: number;
@@ -32,7 +35,6 @@ interface Stats {
     resuelto: number;
   };
   byPriority: {
-    urgente: number;
     alta: number;
     media: number;
     baja: number;
@@ -52,7 +54,6 @@ let stats: Stats = {
   total: 0,
   pendientes: 0,
   resueltos: 0,
-  urgentes: 0,
   bySector: {
     primaria: 0,
     secundaria: 0,
@@ -65,7 +66,6 @@ let stats: Stats = {
     resuelto: 0
   },
   byPriority: {
-    urgente: 0,
     alta: 0,
     media: 0,
     baja: 0
@@ -92,7 +92,6 @@ try {
       
       if (report.status === 'pendiente') stats.pendientes++;
       if (report.status === 'resuelto') stats.resueltos++;
-      if (report.priority === 'urgente') stats.urgentes++;
     });
   }
 } catch (err) {
@@ -138,13 +137,12 @@ const statusDataJson = JSON.stringify({
 });
 
 const priorityDataJson = JSON.stringify({
-  labels: ['Media', 'Alta', 'Baja', 'Urgente'],
+  labels: ['Media', 'Alta', 'Baja'],
   datasets: [{
     data: [
       stats.byPriority.media,
       stats.byPriority.alta,
-      stats.byPriority.baja,
-      stats.byPriority.urgente
+      stats.byPriority.baja
     ],
     backgroundColor: [
       'rgba(245, 158, 11, 0.7)',
@@ -175,19 +173,33 @@ const reportsJson = JSON.stringify(reports);
           <option value="bachillerato">Bachillerato</option>
           <option value="universidad">Universidad</option>
         </select>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-          <div id="totalReports" class="bg-white rounded-xl shadow p-4 text-center animate-fade-in-up animation-delay-100 opacity-0">
-            <h3 class="text-xs font-medium text-gray-500 mb-1">Total de Reportes</h3>
-            <p class="text-2xl md:text-3xl font-bold">{stats.total}</p>
+        <div class="flex gap-6 ">
+          <div id="totalReports" class="bg-white flex items-center gap-x-14 rounded-xl shadow px-7 py-6 text-center animate-fade-in-up animation-delay-100 opacity-0">
+            <div>
+              <h3 class="text-xs font-medium text-gray-500 mb-1">Total de Reportes</h3>
+              <p class="text-2xl md:text-3xl font-bold">{stats.total}</p>
+            </div>
+              <div class="bg-blue-100 rounded-md p-3">
+                <Report class="w-6 h-6 text-blue-600"/>
+              </div>
           </div>
-          <div id="pendingReports" class="bg-white rounded-xl shadow p-4 text-center animate-fade-in-up animation-delay-200 opacity-0">
-            <h3 class="text-xs font-medium text-gray-500 mb-1">Pendientes</h3>
-            <p class="text-2xl md:text-3xl font-bold text-yellow-600">{stats.pendientes}</p>
+          <div id="pendingReports" class="bg-white flex items-center gap-x-14 rounded-xl shadow px-7 py-6 text-center animate-fade-in-up animation-delay-200 opacity-0">
+            <div>
+              <h3 class="text-xs font-medium text-gray-500 mb-1">Pendientes</h3>
+              <p class="text-2xl md:text-3xl font-bold text-orange-600">{stats.pendientes}</p>
+            </div>
+              <div class="bg-orange-100 rounded-md p-3">
+                <Clock class="w-6 h-6 text-orange-600"/>
+              </div>
           </div>
-          <div id="resolvedReports" class="bg-white rounded-xl shadow p-4 text-center animate-fade-in-up animation-delay-300 opacity-0">
-            <h3 class="text-xs font-medium text-gray-500 mb-1">Resueltos</h3>
-            <p class="text-2xl md:text-3xl font-bold text-green-600">{stats.resueltos}</p>
+          <div id="resolvedReports" class="bg-white flex items-center gap-x-14 rounded-xl shadow px-7 py-6  text-center animate-fade-in-up animation-delay-100 opacity-0">
+            <div>
+              <h3 class="text-xs font-medium text-gray-500 mb-1">Resueltos</h3>
+              <p class="text-2xl md:text-3xl font-bold text-green-600">{stats.resueltos}</p>
+            </div>
+              <div class="bg-green-100 rounded-md p-3">
+                <Check class="w-6 h-6 text-green-600"/>
+              </div>
           </div>
         </div>
       </div>
@@ -279,13 +291,11 @@ const reportsJson = JSON.stringify(reports);
                       <div class="flex items-center space-x-2">
                         <span class="text-xs font-medium text-gray-600 uppercase">{report.sector}</span>
                         <span class={`text-xs px-2 py-1 rounded-full font-medium ${
-                          report.priority === 'urgente' ? 'bg-red-100 text-red-800 border border-red-200' :
                           report.priority === 'alta' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
                           report.priority === 'media' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
                           'bg-gray-100 text-gray-800 border border-gray-200'
                         }`}>
-                          {report.priority === 'urgente' ? 'Urgente' :
-                           report.priority === 'alta' ? 'Alta' :
+                           {report.priority === 'alta' ? 'Alta' :
                            report.priority === 'media' ? 'Media' : 'Baja'}
                         </span>
                       </div>
@@ -481,7 +491,6 @@ function calculateStats(reports) {
     total: 0,
     pendientes: 0,
     resueltos: 0,
-    urgentes: 0,
     bySector: {
       primaria: 0,
       secundaria: 0,
@@ -494,7 +503,6 @@ function calculateStats(reports) {
       resuelto: 0
     },
     byPriority: {
-      urgente: 0,
       alta: 0,
       media: 0,
       baja: 0
@@ -509,7 +517,6 @@ function calculateStats(reports) {
     
     if (report.status === 'pendiente') stats.pendientes++;
     if (report.status === 'resuelto') stats.resueltos++;
-    if (report.priority === 'urgente') stats.urgentes++;
   });
   
   return stats;
@@ -600,7 +607,6 @@ function updateRecentReports(recentReports) {
 
 function getPriorityClass(priority) {
   const classes = {
-    'urgente': 'bg-red-100 text-red-800 border border-red-200',
     'alta': 'bg-orange-100 text-orange-800 border border-orange-200',
     'media': 'bg-yellow-100 text-yellow-800 border border-yellow-200',
     'baja': 'bg-gray-100 text-gray-800 border border-gray-200'
@@ -610,7 +616,6 @@ function getPriorityClass(priority) {
 
 function getPriorityText(priority) {
   const texts = {
-    'urgente': 'Urgente',
     'alta': 'Alta',
     'media': 'Media',
     'baja': 'Baja'
@@ -691,13 +696,12 @@ function updateCharts(stats) {
   };
   
   const priorityData = {
-    labels: ['Media', 'Alta', 'Baja', 'Urgente'],
+    labels: ['Media', 'Alta', 'Baja'],
     datasets: [{
       data: [
         stats.byPriority.media,
         stats.byPriority.alta,
-        stats.byPriority.baja,
-        stats.byPriority.urgente
+        stats.byPriority.baja
       ],
       backgroundColor: [
         'rgba(245, 158, 11, 0.7)',

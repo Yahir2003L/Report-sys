@@ -33,14 +33,14 @@ if (!user) {
   return Astro.redirect('/login');
 }
 
-// Verificar que el usuario tiene acceso a primaria
+
 const userCanViewPrimaria = user.role === 'superadmin' || user.role === 'admin' || user.sector === 'primaria';
 
 if (!userCanViewPrimaria) {
   return Astro.redirect('/');
 }
 
-// Obtener reportes del sector primaria
+
 let reports: Report[] = [];
 let filteredReports: Report[] = [];
 
@@ -60,7 +60,7 @@ try {
     reports = allReportsFromAPI.filter(report => report.sector === 'primaria');
     filteredReports = [...reports];
     
-    // Obtener nombres de creadores
+    
     const usersResponse = await fetch(Astro.url.origin + '/api/users', {
       headers: {
         'Cookie': `session_token=${token}`
@@ -101,7 +101,7 @@ const reportsJson = JSON.stringify(reports);
         </div>
             {(user.role === 'admin' || user.role === 'superadmin') && (
                 <button
-                    onclick="document.getElementById('createReportModal').classList.remove('hidden')"
+                    onclick="openCreateModal()"
                     class="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors flex items-center gap-x-2 cursor-pointer"
                 >
                     <Plus class="w-4 h-4" />
@@ -128,14 +128,14 @@ const reportsJson = JSON.stringify(reports);
             </div>
             <!-- Filtros -->
             <div class="flex items-center gap-x-3">
-                <select id="statusFilter" class="px-4 py-2.5 w-[35rem] rounded-lg bg-gray-100 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500">
+                <select id="statusFilter" class="px-4 py-2.5 rounded-lg bg-gray-100 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500">
                 <option value="todos">Todos los estados</option>
                 <option value="pendiente">Pendiente</option>
                 <option value="en_proceso">En Proceso</option>
                 <option value="resuelto">Resuelto</option>
                 </select>
 
-                <select id="priorityFilter" class="px-4 py-2.5 w-[35rem] bg-gray-100 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500">
+                <select id="priorityFilter" class="px-4 py-2.5 bg-gray-100 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500">
                 <option value="todas">Todas las prioridades</option>
                 <option value="alta">Alta</option>
                 <option value="media">Media</option>
@@ -243,17 +243,17 @@ const reportsJson = JSON.stringify(reports);
     </div>
   </div>
 
-  <!-- Modal -->
+  <!-- Modal resolver -->
   {(user.role === 'admin' || user.role === 'superadmin') && (
     <div id="resolveModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-      <div class="fixed inset-0 bg-black bg-opacity-50"></div>
+      <div class="modal-overlay fixed inset-0 bg-black/50" onclick="closeResolveModal()"></div>
       <div class="flex min-h-full items-center justify-center p-4">
-        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg">
+        <div class="relative modal-content bg-white rounded-lg shadow-xl w-full max-w-lg" onclick="event.stopPropagation()">
           <div class="p-6">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-lg font-semibold text-gray-900">Resolver Reporte</h3>
               <button
-                onclick="document.getElementById('resolveModal').classList.add('hidden')"
+                onclick="closeResolveModal()"
                 class="text-gray-400 hover:text-gray-500"
               >
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -292,7 +292,7 @@ const reportsJson = JSON.stringify(reports);
               <div class="flex justify-end space-x-3">
                 <button
                   type="button"
-                  onclick="document.getElementById('resolveModal').classList.add('hidden')"
+                  onclick="closeResolveModal()"
                   class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors"
                 >
                   Cancelar
@@ -315,15 +315,15 @@ const reportsJson = JSON.stringify(reports);
 
   <!-- Modal para Crear Reporte -->
   {(user.role === 'admin' || user.role === 'superadmin') && (
-    <div id="createReportModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-      <div class="fixed inset-0 bg-black bg-opacity-50"></div>
-      <div class="flex min-h-full items-center justify-center p-4">
-        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg">
+    <div id="createReportModal" class="hidden fixed inset-0 z-10 overflow-y-auto" onclick="closeCreateModal()">
+      <div class="modal-overlay fixed inset-0 bg-black/80"></div>
+      <div class="flex min-h-full items-center justify-center p-4 relative z-50">
+        <div class="relative modal-content bg-white rounded-lg shadow-xl w-full max-w-lg">
           <div class="p-6">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-lg font-semibold text-gray-900">Crear Nuevo Reporte - Primaria</h3>
               <button
-                onclick="document.getElementById('createReportModal').classList.add('hidden')"
+                onclick="closeCreateModal()"
                 class="text-gray-400 hover:text-gray-500"
               >
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -342,7 +342,7 @@ const reportsJson = JSON.stringify(reports);
                   id="classroom" 
                   name="classroom"
                   placeholder="Ej: Aula 105"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  class="w-full px-3 py-2 bg-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
               </div>
@@ -354,7 +354,7 @@ const reportsJson = JSON.stringify(reports);
                 <select 
                   id="problemType" 
                   name="problemType"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  class="w-full px-3 py-2 bg-gray-100 rounded-md shadow-sm focus:outline-none"
                   required
                 >
                   <option value="">Selecciona un tipo</option>
@@ -378,7 +378,7 @@ const reportsJson = JSON.stringify(reports);
                 <select 
                   id="priority" 
                   name="priority"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  class="w-full px-3 py-2 bg-gray-100 rounded-md shadow-sm focus:outline-none"
                   required
                 >
                   <option value="">Selecciona prioridad</option>
@@ -397,7 +397,7 @@ const reportsJson = JSON.stringify(reports);
                   name="description"
                   rows="3"
                   placeholder="Describe el problema en detalle..."
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  class="w-full px-3 py-2 bg-gray-100 rounded-md shadow-sm focus:outline-none resize-none"
                   required
                 ></textarea>
               </div>
@@ -405,14 +405,14 @@ const reportsJson = JSON.stringify(reports);
               <div class="flex justify-end space-x-3">
                 <button
                   type="button"
-                  onclick="document.getElementById('createReportModal').classList.add('hidden')"
-                  class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors"
+                  onclick="closeCreateModal()"
+                  class="px-4 py-2 bg-none text-black rounded border font-medium hover:bg-gray-200 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  class="px-4 py-2 bg-black text-white rounded font-medium hover:bg-gray-800 transition-colors cursor-pointer"
                 >
                   Crear Reporte
                 </button>
@@ -430,6 +430,64 @@ const reportsJson = JSON.stringify(reports);
 
 
    <script is:inline>
+  
+window.openCreateModal = function() {
+  const modal = document.getElementById('createReportModal');
+  modal.classList.remove('hidden');
+
+  requestAnimationFrame(() => {
+    modal.classList.add('modal-open');
+  });
+}
+
+window.closeCreateModal = function() {
+   const modal = document.getElementById('createReportModal');
+  modal.classList.remove('modal-open');
+
+  setTimeout(() => {
+    modal.classList.add('hidden');
+  }, 300);
+}
+
+window.openResolveModal = function (reportId, description) {
+  const modal = document.getElementById('resolveModal');
+  const report = allReports.find(r => r.id === reportId);
+  if (!modal || !report) return;
+
+
+  document.getElementById('reportId').value = reportId;
+  document.getElementById('resolveReportTitle').textContent =
+    description.substring(0, 60) + (description.length > 60 ? '...' : '');
+  document.getElementById('resolveReportDescription').textContent =
+    report.description || 'Sin descripción';
+
+  
+  modal.classList.remove('hidden');
+
+  requestAnimationFrame(() => {
+    modal.classList.add('modal-open');
+  });
+
+  const notes = document.getElementById('resolutionNotes');
+  const charCount = document.getElementById('charCount');
+  const submitBtn = document.getElementById('resolveSubmitBtn');
+
+  if (notes) {
+    notes.value = '';
+    charCount.textContent = '0 caracteres';
+    submitBtn.disabled = true;
+  }
+};
+
+
+window.closeResolveModal = function() {
+   const modal = document.getElementById('resolveModal');
+  modal.classList.remove('modal-open');
+
+  setTimeout(() => {
+    modal.classList.add('hidden');
+  }, 300);
+}
   const reportsDataElement = document.getElementById('reportsData');
   const allReports = reportsDataElement ? JSON.parse(reportsDataElement.dataset.reports) : [];
   let filteredReports = [...allReports];
@@ -642,22 +700,6 @@ const reportsJson = JSON.stringify(reports);
   const charCount = document.getElementById('charCount');
   const resolveSubmitBtn = document.getElementById('resolveSubmitBtn');
 
-  window.openResolveModal = function(reportId, description) {
-    const report = allReports.find(r => r.id === reportId);
-    if (!report) return;
-
-    document.getElementById('reportId').value = reportId;
-    document.getElementById('resolveReportTitle').textContent = description.substring(0, 60) + (description.length > 60 ? '...' : '');
-    document.getElementById('resolveReportDescription').textContent = report.description || 'Sin descripción';
-    document.getElementById('resolveModal').classList.remove('hidden');
-    
-
-    if (resolutionNotes) {
-      resolutionNotes.value = '';
-      charCount.textContent = '0 caracteres';
-      resolveSubmitBtn.disabled = true;
-    }
-  }
 
   if (resolutionNotes) {
     resolutionNotes.addEventListener('input', function() {
