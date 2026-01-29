@@ -4,6 +4,36 @@ import { getUserFromToken } from '../lib/auth';
 import { isSuperadmin} from '../lib/access-control';
 import Plus from '@/components/icons/Plus.astro';
 import Check from '@/components/icons/Check.astro';
+import {validSectors, type Sector} from '@/types/sector';
+import {getReportsBySector} from '@/services/reports';
+
+
+const { sector: rawSector } = Astro.params;
+
+if (!rawSector || !validSectors.includes(rawSector as Sector)) {
+  return Astro.redirect('/');
+}
+
+const sector: Sector = rawSector as Sector;
+
+const token = Astro.cookies.get('session_token')?.value;
+const user = token ? await getUserFromToken(token) : null;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+// permisos
+const canViewSector =
+  user.role === 'superadmin' ||
+  user.role === 'admin' ||
+  user.sector === sector;
+
+if (!canViewSector) {
+  return Astro.redirect('/');
+}
+
+
 
 interface Report {
   id: number;
@@ -26,64 +56,21 @@ interface User {
   sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
 }
 
-const token = Astro.cookies.get('session_token')?.value;
-const user = token ? await getUserFromToken(token) : null;
-
-if (!user) {
-  return Astro.redirect('/login');
-}
-
-
-const userCanViewPrimaria = user.role === 'superadmin' || user.role === 'admin' || user.sector === 'primaria';
-
-if (!userCanViewPrimaria) {
-  return Astro.redirect('/');
-}
-
-
 let reports: Report[] = [];
 let filteredReports: Report[] = [];
 
 try {
-  const url = Astro.url;
-  const searchParams = new URLSearchParams(url.search);
+  reports = await getReportsBySector(
+    sector,
+    Astro.url.origin,
+    Astro.request.headers.get('cookie') ?? ''
+  );
   
-  const apiUrl = `${Astro.url.origin}/api/reports?sector=primaria`;
-  const response = await fetch(apiUrl, {
-    headers: {
-      'Cookie': `session_token=${token}`
-    }
-  });
-  
-  if (response.ok) {
-    const allReportsFromAPI: Report[] = await response.json();
-    reports = allReportsFromAPI.filter(report => report.sector === 'primaria');
-    filteredReports = [...reports];
-    
-    
-    const usersResponse = await fetch(Astro.url.origin + '/api/users', {
-      headers: {
-        'Cookie': `session_token=${token}`
-      }
-    });
-    
-    if (usersResponse.ok) {
-      const users = await usersResponse.json();
-      const userMap = new Map();
-      users.forEach((u: any) => {
-        userMap.set(u.id, u.full_name);
-      });
-      
-      reports.forEach(report => {
-        report.created_by_name = userMap.get(report.created_by) || 'Usuario desconocido';
-      });
-      
-      filteredReports = [...reports];
-    }
-  }
+  filteredReports = [...reports];
 } catch (err) {
   console.error('Error al obtener reportes:', err);
 }
+
 
 reports.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 filteredReports.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -91,15 +78,15 @@ filteredReports.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.cre
 const reportsJson = JSON.stringify(reports);
 ---
 
-<Layout user={user}>
+<Layout user={user} currentSector={sector}>
   <div class="h-screen bg-gray-50 p-4 md:p-6 lg:p-8 w-screen flex flex-col overflow-y-auto">
     <!-- Header -->
     <div class="mb-8 flex justify-between items-center">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">Reportes de Primaria</h1>
-            <p class="text-gray-600 mt-2">Gestiona los reportes del sector primaria</p>
+            <h1 class="text-3xl font-bold text-gray-900">Reportes de {sector.charAt(0).toUpperCase() + sector.slice(1)}</h1>
+            <p class="text-gray-600 mt-2">Gestiona los reportes del sector {sector}</p>
         </div>
-            {(user.role === 'admin' || user.role === 'superadmin') && (
+            {(user.role === 'admin' || user.role === 'superadmin' || user.role === 'user') && (
                 <button
                     onclick="openCreateModal()"
                     class="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors flex items-center gap-x-2 cursor-pointer"
@@ -237,7 +224,7 @@ const reportsJson = JSON.stringify(reports);
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <h3 class="mt-4 text-lg font-medium text-gray-900">No hay reportes</h3>
-          <p class="mt-1 text-gray-500">No se encontraron reportes para el sector primaria.</p>
+          <p class="mt-1 text-gray-500">No se encontraron reportes para el sector {sector}.</p>
         </div>
       )}
     </div>
@@ -314,14 +301,14 @@ const reportsJson = JSON.stringify(reports);
   )}
 
   <!-- Modal para Crear Reporte -->
-  {(user.role === 'admin' || user.role === 'superadmin') && (
+  {(user.role === 'admin' || user.role === 'superadmin' || user.role === 'user') && (
     <div id="createReportModal" class="hidden fixed inset-0 z-10 overflow-y-auto" onclick="closeCreateModal()">
       <div class="modal-overlay fixed inset-0 bg-black/80"></div>
       <div class="flex min-h-full items-center justify-center p-4 relative z-50">
         <div class="relative modal-content bg-white rounded-lg shadow-xl w-full max-w-lg" onclick="event.stopPropagation()">
           <div class="p-6">
             <div class="flex justify-between items-center mb-4">
-              <h3 class="text-lg font-semibold text-gray-900">Crear Nuevo Reporte - Primaria</h3>
+              <h3 class="text-lg font-semibold text-gray-900">Crear Nuevo Reporte - {sector.charAt(0).toUpperCase() + sector.slice(1)}</h3>
               <button
                 onclick="closeCreateModal()"
                 class="text-gray-400 hover:text-gray-500"
@@ -368,7 +355,7 @@ const reportsJson = JSON.stringify(reports);
               </div>
 
            
-              <input type="hidden" name="sector" value="primaria" />
+              <input type="hidden" name="sector" value={sector} />
 
              
               <div>
@@ -429,11 +416,10 @@ const reportsJson = JSON.stringify(reports);
   <div id="userData" data-role={user.role} style="display: none;"></div>
 
 
-   <script is:inline>
-  
-window.openCreateModal = function() {
-  const modal = document.getElementById('createReportModal');
-  modal.classList.remove('hidden');
+<script is:inline>
+    window.openCreateModal = function() {
+    const modal = document.getElementById('createReportModal');
+    modal.classList.remove('hidden');
 
   requestAnimationFrame(() => {
     modal.classList.add('modal-open');

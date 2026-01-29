@@ -149,15 +149,19 @@ export const GET: APIRoute = async ({ cookies, url }) => {
         `;
         let params: (string | number)[] = [];
 
+        console.log('sectorParam:', sectorParam);
+        console.log('user role:', currentUser.role);
+        console.log('user sector:', currentUser.sector);
+
         if (userId) {
             query += ` WHERE r.created_by = ?`;
             params.push(userId);
+        } else if (sectorParam) {
+            query += ` WHERE r.sector = ?`;
+            params.push(sectorParam);
         } else if (currentUser.role === 'user') {
             query += ` WHERE r.sector = ?`;
             params.push(currentUser.sector);
-        } else if (sectorParam) {
-             query += ` WHERE r.sector = ?`;
-            params.push(sectorParam);
         }
 
         query += ` ORDER BY 
