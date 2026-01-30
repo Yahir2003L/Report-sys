@@ -38,7 +38,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const username = formData.get('username')?.toString() || '';
   const password = formData.get('password')?.toString() || '';
   const fullName = formData.get('fullName')?.toString() || '';
-  const role = formData.get('role')?.toString() as 'admin' | 'user';
+  const role = formData.get('role')?.toString() as 'superadmin' | 'tecnico' | 'user';
   const sector = formData.get('sector')?.toString() as string;
 
   const [existing] = await pool.query<mysql.RowDataPacket[]>(

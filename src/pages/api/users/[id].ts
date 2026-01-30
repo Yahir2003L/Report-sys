@@ -9,7 +9,7 @@ interface User {
   id: number;
   username: string;
   full_name: string;
-  role: 'user' | 'admin' | 'superadmin';
+  role: 'user' | 'tecnico' | 'superadmin';
   sector: string;
   is_active: boolean;
   created_by?: string;

@@ -7,7 +7,7 @@ interface Props {
     userId: number;
     username: string;
     fullName: string;
-    role: 'superadmin' | 'admin' | 'user';
+    role: 'superadmin' | 'tecnico' | 'user';
     sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
   } | null | undefined;
 }
@@ -98,7 +98,7 @@ const isSuperAdmin = user ? isSuperadmin(user) : false;
                   name="role" 
                   required
                 >
-                  <option value="admin">Administrador</option>
+                  <option value="tecnico">Administrador</option>
                   <option value="user">Usuario</option>
                 </select>
               </div>

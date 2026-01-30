@@ -262,7 +262,7 @@ export const PATCH: APIRoute = async ({ request, cookies }) => {
             );
         }
 
-        if (currentUser.role !== 'admin' && currentUser.role !== 'superadmin') {
+        if (currentUser.role !== 'tecnico' && currentUser.role !== 'superadmin') {
             return new Response(
                 JSON.stringify({ message: 'No tienes permiso para esta acción' }),
                 { status: 403 }

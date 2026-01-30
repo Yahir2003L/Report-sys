@@ -8,6 +8,7 @@ import EditUserModal from '@/components/EditUserModal.astro';
 import Edit from '@/components/icons/Edit.astro';
 import Disable from '@/components/icons/Disable.astro';
 import Activate from '@/components/icons/Activate.astro';
+import CreateUserModal from '@/components/CreateUserModal.astro';
 
 interface User {
   id: number;
@@ -54,6 +55,8 @@ const users = await getAllUsers();
 <Layout title="Gestión de Usuarios" user={currentUser} token={token}>
   <main class="px-10 mx-auto py-8">
     <h1 class="text-2xl font-bold mb-6">Gestión de Usuarios</h1>
+    {currentUser?.role === 'superadmin' && <CreateUserModal user={currentUser} />}
+
     
     <div class="overflow-x-auto shadow-2xl rounded-lg">
       <table class="min-w-full bg-white">

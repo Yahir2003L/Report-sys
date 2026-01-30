@@ -1,4 +1,4 @@
-export type UserRole = 'superadmin' | 'admin' | 'user';
+export type UserRole = 'superadmin' | 'tecnico' | 'user';
 export type UserSector = 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
 
 export interface UserSession {
@@ -11,7 +11,7 @@ export interface UserSession {
 
 const roleHierarchy: Record<UserRole, number> = {
   superadmin: 3,
-  admin: 2,
+  tecnico: 2,
   user: 1
 };
 
@@ -55,7 +55,7 @@ export function canCreateReport(user: UserSession | null): boolean {
 }
 
 export function canViewAllReports(user: UserSession | null): boolean {
-  return user?.role === 'superadmin' || user?.role === 'admin';
+  return user?.role === 'superadmin' || user?.role === 'tecnico';
 }
 
 export function canViewSectorReports(user: UserSession | null): boolean {
