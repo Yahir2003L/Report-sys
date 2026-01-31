@@ -176,7 +176,9 @@ const reportsJson = JSON.stringify(reports);
         <div class="flex gap-6 ">
           <div id="totalReports" class="bg-white flex items-center gap-x-14 rounded-xl shadow px-7 py-6 text-center animate-fade-in-up animation-delay-100 opacity-0">
             <div>
-              <h3 class="text-xs font-medium text-gray-500 mb-1">Total de Reportes</h3>
+              <h3 class="text-xs font-medium text-gray-500 mb-1">
+                {user?.role === 'tecnico' ? 'Mis Reportes' : 'Total de Reportes'}
+              </h3>
               <p class="text-2xl md:text-3xl font-bold">{stats.total}</p>
             </div>
               <div class="bg-blue-100 rounded-md p-3">
@@ -185,7 +187,9 @@ const reportsJson = JSON.stringify(reports);
           </div>
           <div id="pendingReports" class="bg-white flex items-center gap-x-14 rounded-xl shadow px-7 py-6 text-center animate-fade-in-up animation-delay-200 opacity-0">
             <div>
-              <h3 class="text-xs font-medium text-gray-500 mb-1">Pendientes</h3>
+              <h3 class="text-xs font-medium text-gray-500 mb-1">
+                {user?.role === 'tecnico' ? 'Mis reportes pendientes' : 'Pendientes'}
+              </h3>
               <p class="text-2xl md:text-3xl font-bold text-orange-600">{stats.pendientes}</p>
             </div>
               <div class="bg-orange-100 rounded-md p-3">
@@ -194,7 +198,9 @@ const reportsJson = JSON.stringify(reports);
           </div>
           <div id="resolvedReports" class="bg-white flex items-center gap-x-14 rounded-xl shadow px-7 py-6  text-center animate-fade-in-up animation-delay-100 opacity-0">
             <div>
-              <h3 class="text-xs font-medium text-gray-500 mb-1">Resueltos</h3>
+              <h3 class="text-xs font-medium text-gray-500 mb-1">
+                {user?.role === 'tecnico' ? 'Mis reportes resueltos' : 'Resueltos'}
+              </h3>
               <p class="text-2xl md:text-3xl font-bold text-green-600">{stats.resueltos}</p>
             </div>
               <div class="bg-green-100 rounded-md p-3">
@@ -880,58 +886,6 @@ function animateValue(element, start, end, duration) {
   
   requestAnimationFrame(step);
 }
-
-  if (typeof Chart !== 'undefined') {
-   
-    const sectorCtx = document.getElementById('sectorChart');
-    if (sectorCtx) {
-      new Chart(sectorCtx, {
-        type: 'bar',
-        data: sectorData,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: true, ticks: { stepSize: 1 } }
-          }
-        }
-      });
-    }
-   
-    const statusCtx = document.getElementById('statusChart');
-    if (statusCtx) {
-      new Chart(statusCtx, {
-        type: 'doughnut',
-        data: statusData,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          cutout: '70%'
-        }
-      });
-    }
-    
-
-    const priorityCtx = document.getElementById('priorityChart');
-    if (priorityCtx) {
-      new Chart(priorityCtx, {
-        type: 'pie',
-        data: priorityData,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { 
-            legend: { 
-              position: 'bottom',
-              labels: { padding: 15, usePointStyle: true }
-            } 
-          }
-        }
-      });
-    }
-  }
 </script>
 </Layout>
 

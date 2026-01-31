@@ -17,7 +17,7 @@ export interface User {
   username: string;
   password: string;
   full_name: string;
-  role: 'superadmin' | 'admin' | 'user';
+  role: 'superadmin' | 'tecnico' | 'user';
   sector: 'primaria' | 'secundaria' | 'bachillerato' | 'universidad';
   created_by: number | null;
   created_at: Date; 

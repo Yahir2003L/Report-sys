@@ -84,9 +84,13 @@ const reportsJson = JSON.stringify(reports);
     <div class="mb-8 flex justify-between items-center">
         <div>
             <h1 class="text-3xl font-bold text-gray-900">Reportes de {sector.charAt(0).toUpperCase() + sector.slice(1)}</h1>
-            <p class="text-gray-600 mt-2">Gestiona los reportes del sector {sector}</p>
+            <p class="text-gray-600 mt-2">
+              {user.role === 'tecnico'
+                ? 'Gestiona tus reportes asignados en este sector'
+                : `Gestiona los reportes del sector ${sector}`}
+            </p>
         </div>
-            {(user.role === 'tecnico' || user.role === 'superadmin' || user.role === 'user') && (
+            {(user.role === 'superadmin' || user.role === 'user') && (
                 <button
                     onclick="openCreateModal()"
                     class="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors flex items-center gap-x-2 cursor-pointer"
@@ -206,7 +210,7 @@ const reportsJson = JSON.stringify(reports);
               </div>
 
 
-              {(user.role === 'tecnico' || user.role === 'superadmin') && report.status !== 'resuelto' && (
+              {(user.role === 'superadmin' || user.role === 'tecnico') && report.status !== 'resuelto' && (
                 <button
                   onclick={`openResolveModal(${report.id}, "${report.description.replace(/"/g, '&quot;').replace(/'/g, "\\'")}")`}
                   class="px-4 py-2 flex items-center gap-x-2 bg-black text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
@@ -254,7 +258,7 @@ const reportsJson = JSON.stringify(reports);
               <p class="text-gray-700" id="resolveReportDescription"></p>
             </div>
 
-            <form id="resolveForm" method="POST" action="/api/reports/resolve" class="space-y-4">
+            <form id="resolveForm" method="POST" class="space-y-4">
               <input type="hidden" id="reportId" name="reportId" />
               
               <div>
@@ -301,7 +305,7 @@ const reportsJson = JSON.stringify(reports);
   )}
 
   <!-- Modal para Crear Reporte -->
-  {(user.role === 'tecnico' || user.role === 'superadmin' || user.role === 'user') && (
+  {(user.role === 'superadmin' || user.role === 'user') && (
     <div id="createReportModal" class="hidden fixed inset-0 z-10 overflow-y-auto" onclick="closeCreateModal()">
       <div class="modal-overlay fixed inset-0 bg-black/80"></div>
       <div class="flex min-h-full items-center justify-center p-4 relative z-50">
@@ -376,6 +380,21 @@ const reportsJson = JSON.stringify(reports);
               </div>
 
               <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Asignar a técnico
+                </label>
+
+                <select
+                  id="assignedTo"
+                  name="assignedTo"
+                  required
+                  class="w-full px-3 py-2 bg-gray-100 rounded-md shadow-sm focus:outline-none"
+                >
+                  <option value="">Selecciona un técnico</option>
+                </select>
+              </div>
+
+              <div>
                 <label for="description" class="block text-sm font-medium text-gray-700 mb-1">
                   Descripción *
                 </label>
@@ -417,9 +436,33 @@ const reportsJson = JSON.stringify(reports);
 
 
 <script is:inline>
+    async function loadTecnicos() {
+      try {
+        const res = await fetch('/api/tecnicos');
+        if (!res.ok) return;
+
+        const tecnicos = await res.json();
+        const select = document.getElementById('assignedTo');
+
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Selecciona un técnico</option>';
+
+        tecnicos.forEach(t => {
+          const option = document.createElement('option');
+          option.value = t.id;
+          option.textContent = t.full_name;
+          select.appendChild(option);
+        });
+      } catch (err) {
+        console.error('Error cargando técnicos', err);
+      }
+    }
+
     window.openCreateModal = function() {
     const modal = document.getElementById('createReportModal');
     modal.classList.remove('hidden');
+    loadTecnicos();
 
   requestAnimationFrame(() => {
     modal.classList.add('modal-open');
@@ -691,7 +734,7 @@ window.closeResolveModal = function() {
     resolutionNotes.addEventListener('input', function() {
       const length = this.value.length;
       charCount.textContent = `${length} caracteres`;
-      resolveSubmitBtn.disabled = length < 20;
+      resolveSubmitBtn.disabled = length < 50;
     });
   }
 
@@ -702,8 +745,8 @@ window.closeResolveModal = function() {
       const reportId = document.getElementById('reportId').value;
       const resolutionNotes = document.getElementById('resolutionNotes').value;
       
-      if (resolutionNotes.length < 20) {
-        alert('La descripción de la resolución debe tener al menos 20 caracteres');
+      if (resolutionNotes.length < 50) {
+        alert('La descripción de la resolución debe tener al menos 50 caracteres');
         return;
       }
 

@@ -51,13 +51,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
           { status: 200 }
         );
       } else if (contentType.includes('multipart/form-data')) {
-        // Crear reporte desde formulario
         const formData = await request.formData();
         const classroom = formData.get('classroom')?.toString() || '';
         const problemType = formData.get('problemType')?.toString() as Report['problem_type'];
         const description = formData.get('description')?.toString() || '';
         const priority = formData.get('priority')?.toString() as Report['priority'];
-  
+        const assignedTo = formData.get('assignedTo')?.toString();
+
         let sector = currentUser.sector;
         if (currentUser.role !== 'user') {
           const selectedSector = formData.get('sector')?.toString();
@@ -65,11 +65,18 @@ export const POST: APIRoute = async ({ request, cookies }) => {
             sector = selectedSector as Report['sector'];
           }
         }
-  
+
         if (!classroom || !problemType) {
           return new Response(JSON.stringify({ message: 'Campos requeridos faltantes' }), { status: 400 });
         }
-  
+
+        if (!assignedTo || !/^\d+$/.test(assignedTo)) {
+            return new Response(
+                JSON.stringify({ message: 'Debes asignar el reporte a un técnico válido' }),
+                { status: 400 }
+            );
+        }
+
         const [existingReports] = await pool.query<mysql.RowDataPacket[]>(
           `SELECT id FROM reports 
            WHERE classroom = ? 
@@ -78,7 +85,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
            AND status != 'resuelto'`,
           [classroom, sector, problemType]
         );
-  
+
         if (existingReports.length > 0) {
           const [duplicate] = existingReports;
           return new Response(
@@ -90,12 +97,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
             { status: 400 }
           );
         }
-  
+
         await pool.query(
           `INSERT INTO reports 
-           (classroom, problem_type, description, sector, created_by, priority) 
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [classroom, problemType, description, sector, currentUser.userId, priority]
+           (classroom, problem_type, description, sector, created_by, priority, assigned_to) 
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [classroom, problemType, description, sector, currentUser.userId, priority, assignedTo]
         );
   
         return new Response(
@@ -127,6 +134,8 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 
         const sectorParam = url.searchParams.get('sector');
         const userIdParam = url.searchParams.get('user');
+        const userId = userIdParam ? parseInt(userIdParam, 10) : null;
+        
         
         // Validación
         if (userIdParam && !/^\d+$/.test(userIdParam)) {
@@ -136,33 +145,47 @@ export const GET: APIRoute = async ({ cookies, url }) => {
             );
         }
 
-        const userId = userIdParam ? parseInt(userIdParam, 10) : null;
+        
         let query = `
             SELECT r.id, r.classroom, r.problem_type, r.description, 
             r.status, r.priority, r.sector, r.created_at, 
-            r.created_by, r.resolved_at, r.resolved_by, r.resolution_notes,
+            r.created_by, r.assigned_to, r.resolved_at, r.resolved_by, r.resolution_notes,
             u.full_name as created_by_name,
             u_resolved.full_name as resolved_by_name
             FROM reports r
             JOIN users u ON r.created_by = u.id
             LEFT JOIN users u_resolved ON r.resolved_by = u_resolved.id
         `;
-        let params: (string | number)[] = [];
 
-        console.log('sectorParam:', sectorParam);
-        console.log('user role:', currentUser.role);
-        console.log('user sector:', currentUser.sector);
+        let conditions: string[] = [];
+        let params: (string|number)[] = [];
 
-        if (userId) {
-            query += ` WHERE r.created_by = ?`;
-            params.push(userId);
-        } else if (sectorParam) {
-            query += ` WHERE r.sector = ?`;
-            params.push(sectorParam);
-        } else if (currentUser.role === 'user') {
-            query += ` WHERE r.sector = ?`;
+        if (currentUser.role === 'user') {
+            conditions.push('r.sector = ?');
             params.push(currentUser.sector);
+        } else if (currentUser.role === 'tecnico') {
+            conditions.push('r.assigned_to = ?');
+            params.push(currentUser.userId);
+            if (sectorParam) {
+                conditions.push('r.sector = ?');
+                params.push(sectorParam);
+            }
+        } else if (currentUser.role === 'superadmin') {
+            if (sectorParam) {
+                conditions.push('r.sector = ?');
+                params.push(sectorParam);
+            }
+            if (userId) {
+                conditions.push('r.created_by = ?');
+                params.push(userId);
+            }
         }
+
+        if (conditions.length) {
+            query += ' WHERE ' + conditions.join(' AND ');
+        }
+
+
 
         query += ` ORDER BY 
                 CASE 
@@ -276,9 +299,9 @@ export const PATCH: APIRoute = async ({ request, cookies }) => {
 
 
         if (newStatus === 'resuelto') {
-            if (!resolutionNotes || resolutionNotes.length < 20) {
+            if (!resolutionNotes || resolutionNotes.length < 50) {
                 return new Response(
-                    JSON.stringify({ message: 'Las notas de resolución deben tener al menos 20 caracteres' }),
+                    JSON.stringify({ message: 'Las notas de resolución deben tener al menos 50 caracteres' }),
                     { status: 400 }
                 );
             }
@@ -294,6 +317,21 @@ export const PATCH: APIRoute = async ({ request, cookies }) => {
                     JSON.stringify({ message: 'Reporte no encontrado' }),
                     { status: 404 }
                 );
+            }
+
+            // asignacion de reporte a tecnico
+            if (currentUser.role === 'tecnico') {
+                const [assigned] = await pool.query<mysql.RowDataPacket[]>(
+                    'SELECT assigned_to FROM reports WHERE id = ?',
+                    [reportId]
+                );
+
+                if (!assigned.length || assigned[0].assigned_to !== currentUser.userId) {
+                    return new Response(
+                        JSON.stringify({ message: 'Este reporte no está asignado a ti' }),
+                        { status: 403 }
+                    );
+                }
             }
 
             if (existingReport[0].status === 'resuelto') {

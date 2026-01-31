@@ -75,7 +75,7 @@ CREATE TABLE `users` (
   `username` varchar(50) NOT NULL COMMENT 'Nombre de usuario único',
   `password` varchar(60) NOT NULL COMMENT 'Hash de contraseña (bcrypt)',
   `full_name` varchar(100) NOT NULL COMMENT 'Nombre completo del usuario',
-  `role` enum('superadmin','admin','user') NOT NULL,
+  `role` enum('superadmin','tecnico','user') NOT NULL,
   `sector` enum('primaria','secundaria','bachillerato','universidad') NOT NULL COMMENT 'Área de trabajo',
   `created_by` int(11) DEFAULT NULL COMMENT 'ID del usuario que creó este registro',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp() COMMENT 'Fecha de creación',
