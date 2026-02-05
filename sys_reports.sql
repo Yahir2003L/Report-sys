@@ -221,6 +221,13 @@ ALTER TABLE `user_sessions`
   ADD CONSTRAINT `user_sessions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 COMMIT;
 
+-- Agregar columnas para seguimiento de reasignaciones en la tabla reports
+ALTER TABLE reports 
+ADD COLUMN previous_technician_id INT NULL,
+ADD COLUMN reassigned_at TIMESTAMP NULL,
+ADD CONSTRAINT fk_previous_technician 
+FOREIGN KEY (previous_technician_id) REFERENCES users(id);
+
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
