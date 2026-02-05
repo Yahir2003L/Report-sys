@@ -1,6 +1,7 @@
 ---
 import { isSuperadmin } from '../lib/access-control';
 import Create from './icons/Create.astro';
+import Plus from './icons/Plus.astro';
 
 interface Props {
   user: {
@@ -20,11 +21,11 @@ const isSuperAdmin = user ? isSuperadmin(user) : false;
   <>
     <button
       type="button"
-      class="px-4 py-2 flex items-center gap-x-2 bg-white border-gray-500 border-1 cursor-pointer text-sm text-black rounded-full font-semibold"
+      class="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors flex items-center gap-x-2 cursor-pointer"
       onclick="document.getElementById('createUserModal').classList.remove('hidden')"
     >
 
-    <Create class="w-5"/>
+    <Plus class="w-5 h-5" />
       Crear Usuario
     </button>
 
