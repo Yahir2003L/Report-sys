@@ -4,6 +4,7 @@ import { getUserFromToken } from '../lib/auth';
 import { isSuperadmin} from '../lib/access-control';
 import Plus from '@/components/icons/Plus.astro';
 import Check from '@/components/icons/Check.astro';
+import ReassignModal from '@/components/ReassignModal.astro';
 import {validSectors, type Sector} from '@/types/sector';
 import {getReportsBySector} from '@/services/reports';
 
@@ -46,6 +47,8 @@ interface Report {
   created_at: string;
   created_by: number;
   created_by_name: string;
+  assigned_to?: number;
+  assigned_to_name?: string;
 }
 
 interface User {
@@ -76,6 +79,21 @@ reports.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at)
 filteredReports.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
 const reportsJson = JSON.stringify(reports);
+
+let technicians = [];
+
+try{
+  const tecnicosRes = await fetch(`${Astro.url.origin}/api/tecnicos`, {
+    headers: {
+      cookie: Astro.request.headers.get('cookie') ?? ''
+    }
+  });
+  if (tecnicosRes.ok) {
+    technicians = await tecnicosRes.json();
+  }
+} catch(err) {
+  console.error('Error al obtener técnicos:', err);
+}
 ---
 
 <Layout user={user} currentSector={sector}>
@@ -138,107 +156,168 @@ const reportsJson = JSON.stringify(reports);
 
     <!-- Lista de Reportes -->
     <div id="reportsContainer" class="space-y-6 flex-1 overflow-y-auto">
-      {filteredReports.length > 0 ? filteredReports.map((report) => (
-        <!-- Tarjeta de Reporte -->
-        <div 
-          class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
-          data-status={report.status}
-          data-priority={report.priority}
-          data-report-id={report.id}
-        >
-          <div class="p-6">
-            <!-- Header de la tarjeta -->
-            <div class="flex justify-between items-start mb-4">
-              <div>
-                <h3 class="text-xl font-semibold text-gray-900 mb-1">{report.description.substring(0, 60)}{report.description.length > 60 ? '...' : ''}</h3>
-                <div class="flex items-center space-x-3">
-                  <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                    Aula {report.classroom}
-                  </span>
-                  <span class={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    report.problem_type === 'red' ? 'bg-purple-100 text-purple-800' :
-                    report.problem_type === 'telefonico' ? 'bg-indigo-100 text-indigo-800' :
-                    report.problem_type === 'proyector' ? 'bg-pink-100 text-pink-800' :
-                    report.problem_type === 'pantalla' ? 'bg-cyan-100 text-cyan-800' :
-                    report.problem_type === 'electrico' ? 'bg-amber-100 text-amber-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {report.problem_type === 'red' ? 'Problema de Red' :
-                     report.problem_type === 'telefonico' ? 'Problema Telefónico' :
-                     report.problem_type === 'proyector' ? 'Problema con Proyector' :
-                     report.problem_type === 'pantalla' ? 'Problema con Pantalla' :
-                     report.problem_type === 'electrico' ? 'Problema Eléctrico' : 'Problema General'}
-                  </span>
-                </div>
-              </div>
-              
-              <div class="flex flex-col items-end space-y-2">
-                <!-- Prioridad -->
-                <span class={`px-3 py-1 rounded-full text-sm font-medium ${
-                  report.priority === 'alta' ? 'bg-red-100 text-red-800 border border-red-200' :
-                  report.priority === 'media' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                  'bg-green-100 text-green-800 border border-green-200'
-                }`}>
-                  {report.priority === 'alta' ? 'Alta' :
-                   report.priority === 'media' ? 'Media' : 'Baja'}
+  {filteredReports.length > 0 ? filteredReports.map((report) => {
+    // Determinar permisos
+    const isReportAssignedToCurrentUser = user.userId === report.assigned_to;
+    const canReassign = (user.role === 'superadmin' || 
+                        (user.role === 'tecnico' && isReportAssignedToCurrentUser)) &&
+                       report.status === 'pendiente';
+    const userCanResolve = (user.role === 'tecnico' || user.role === 'superadmin') && report.status !== 'resuelto';
+    
+    return (
+      <!-- Tarjeta de Reporte -->
+      <div 
+        class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+        data-status={report.status}
+        data-priority={report.priority}
+        data-report-id={report.id}
+      >
+        <div class="p-6">
+          <!-- Header de la tarjeta (igual que antes) -->
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h3 class="text-xl font-semibold text-gray-900 mb-1">{report.description.substring(0, 60)}{report.description.length > 60 ? '...' : ''}</h3>
+              <div class="flex items-center space-x-3">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                  Aula {report.classroom}
                 </span>
-                
-                <!-- Estado -->
-                <span class={`px-3 py-1 rounded-full text-sm font-medium ${
-                  report.status === 'pendiente' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                  report.status === 'en_proceso' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                  'bg-green-100 text-green-800 border border-green-200'
+                <span class={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  report.problem_type === 'red' ? 'bg-purple-100 text-purple-800' :
+                  report.problem_type === 'telefonico' ? 'bg-indigo-100 text-indigo-800' :
+                  report.problem_type === 'proyector' ? 'bg-pink-100 text-pink-800' :
+                  report.problem_type === 'pantalla' ? 'bg-cyan-100 text-cyan-800' :
+                  report.problem_type === 'electrico' ? 'bg-amber-100 text-amber-800' :
+                  'bg-gray-100 text-gray-800'
                 }`}>
-                  {report.status === 'pendiente' ? 'Pendiente' :
-                   report.status === 'en_proceso' ? 'En Proceso' : 'Resuelto'}
+                  {report.problem_type === 'red' ? 'Problema de Red' :
+                   report.problem_type === 'telefonico' ? 'Problema Telefónico' :
+                   report.problem_type === 'proyector' ? 'Problema con Proyector' :
+                   report.problem_type === 'pantalla' ? 'Problema con Pantalla' :
+                   report.problem_type === 'electrico' ? 'Problema Eléctrico' : 'Problema General'}
                 </span>
               </div>
             </div>
-
             
-            <p class="text-gray-700 mb-4">{report.description || 'Sin descripción'}</p>
+            <div class="flex flex-col items-end space-y-2">
+              <!-- Prioridad -->
+              <span class={`px-3 py-1 rounded-full text-sm font-medium ${
+                report.priority === 'alta' ? 'bg-red-100 text-red-800 border border-red-200' :
+                report.priority === 'media' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                'bg-green-100 text-green-800 border border-green-200'
+              }`}>
+                {report.priority === 'alta' ? 'Alta' :
+                 report.priority === 'media' ? 'Media' : 'Baja'}
+              </span>
+              
+              <!-- Estado -->
+              <span class={`px-3 py-1 rounded-full text-sm font-medium ${
+                report.status === 'pendiente' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                report.status === 'en_proceso' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                'bg-green-100 text-green-800 border border-green-200'
+              }`}>
+                {report.status === 'pendiente' ? 'Pendiente' :
+                 report.status === 'en_proceso' ? 'En Proceso' : 'Resuelto'}
+              </span>
+            </div>
+          </div>
 
+          <!-- Descripción -->
+          <p class="text-gray-700 mb-4">{report.description || 'Sin descripción'}</p>
 
-            <div class="flex justify-between items-center pt-4 border-t border-gray-100">
-              <div class="text-sm text-gray-500">
-                <p>Creado por: <span class="font-medium">{report.created_by_name || 'Usuario'}</span></p>
-                <p>{new Date(report.created_at).toLocaleDateString('es-ES', { 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}</p>
+          <!-- INFORMACIÓN DEL TÉCNICO - AHORA COMO UN SPAN PEQUEÑO -->
+          <div class="mb-4 flex items-center justify-between">
+            <div class="flex items-center gap-x-4 text-sm text-gray-600">
+              <!-- Creado por -->
+              <div class="flex items-center gap-x-1">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span class="font-medium">Creado por:</span>
+                <span>{report.created_by_name || 'Usuario'}</span>
               </div>
+              
+              <!-- Técnico asignado -->
+              {report.assigned_to_name && (
+                <div class="flex items-center gap-x-1">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span class="font-medium">Técnico:</span>
+                  <span class="font-semibold text-gray-900">{report.assigned_to_name}</span>
+                </div>
+              )}
+              
+              <!-- Fecha -->
+              <div class="flex items-center gap-x-1">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>{new Date(report.created_at).toLocaleDateString('es-ES', { 
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                })}</span>
+              </div>
+            </div>
+          </div>
 
-
-              {(user.role === 'superadmin' || user.role === 'tecnico') && report.status !== 'resuelto' && (
+          <!-- BOTONES DE ACCIÓN - SOLO REASIGNAR Y RESOLVER -->
+          {(canReassign || userCanResolve) && (
+            <div class="flex justify-end gap-x-2 pt-4 border-t border-gray-100">
+              {canReassign && (
                 <button
-                  onclick={`openResolveModal(${report.id}, "${report.description.replace(/"/g, '&quot;').replace(/'/g, "\\'")}")`}
-                  class="px-4 py-2 flex items-center gap-x-2 bg-black text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+                  onclick={`openReassignModal(${report.id}, ${report.assigned_to}, '${(report.assigned_to_name || '').replace(/'/g, "\\'")}')`}
+                  class="px-4 py-2 flex items-center gap-x-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors cursor-pointer"
                 >
-                    <Check class="w-4 h-4" />
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  Reasignar
+                </button>
+              )}
+              
+              {userCanResolve && (
+                <button
+                  onclick={`openResolveModal(${report.id})`}
+                  class="px-4 py-2 flex items-center gap-x-2 bg-black text-white rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="m9 12 2 2 4-4"/>
+                  </svg>
                   Resolver
                 </button>
               )}
             </div>
-          </div>
+          )}
         </div>
-      )) : (
-        <div class="text-center py-16 bg-white rounded-xl shadow">
-          <svg class="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <h3 class="mt-4 text-lg font-medium text-gray-900">No hay reportes</h3>
-          <p class="mt-1 text-gray-500">No se encontraron reportes para el sector {sector}.</p>
-        </div>
-      )}
+      </div>
+    );
+  }) : (
+    <!-- Cuando no hay reportes -->
+    <div class="text-center py-16 bg-white rounded-xl shadow">
+      <svg class="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+      <h3 class="mt-4 text-lg font-medium text-gray-900">No hay reportes</h3>
+      <p class="mt-1 text-gray-500">No se encontraron reportes para el sector {sector}.</p>
     </div>
+  )}
+</div>
   </div>
+
+  <!-- Modal para Reasignar Reporte -->
+  <ReassignModal 
+    technicians={technicians}
+    reportId={0}
+    currentTechnicianId={0}
+  />
 
   <!-- Modal resolver -->
   {(user.role === 'tecnico' || user.role === 'superadmin') && (
-    <div id="resolveModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-      <div class="modal-overlay fixed inset-0 bg-black/50" onclick="closeResolveModal()"></div>
-      <div class="flex min-h-full items-center justify-center p-4">
+    <div id="resolveModal" class="hidden fixed inset-0 z-50 overflow-y-auto modal-base" onclick="closeResolveModal()">
+      <div class="modal-overlay fixed inset-0 bg-black/50"></div>
+      <div class="flex min-h-full items-center justify-center p-4 relative z-50">
         <div class="relative modal-content bg-white rounded-lg shadow-xl w-full max-w-lg" onclick="event.stopPropagation()">
           <div class="p-6">
             <div class="flex justify-between items-center mb-4">
@@ -306,7 +385,7 @@ const reportsJson = JSON.stringify(reports);
 
   <!-- Modal para Crear Reporte -->
   {(user.role === 'superadmin' || user.role === 'user') && (
-    <div id="createReportModal" class="hidden fixed inset-0 z-10 overflow-y-auto" onclick="closeCreateModal()">
+    <div id="createReportModal" class="hidden fixed inset-0 z-10 overflow-y-auto modal-base" onclick="closeCreateModal()">
       <div class="modal-overlay fixed inset-0 bg-black/80"></div>
       <div class="flex min-h-full items-center justify-center p-4 relative z-50">
         <div class="relative modal-content bg-white rounded-lg shadow-xl w-full max-w-lg" onclick="event.stopPropagation()">
@@ -432,7 +511,7 @@ const reportsJson = JSON.stringify(reports);
 
 
   <div id="reportsData" data-reports={reportsJson} style="display: none;"></div>
-  <div id="userData" data-role={user.role} style="display: none;"></div>
+  <div id="userData" data-role={user.role} data-user-id={user.userId} style="display: none;"></div>
 
 
 <script is:inline>
@@ -475,7 +554,7 @@ window.closeCreateModal = function() {
 
   setTimeout(() => {
     modal.classList.add('hidden');
-  }, 300);
+  }, 350);
 }
 
 window.openResolveModal = function (reportId, description) {
@@ -485,8 +564,9 @@ window.openResolveModal = function (reportId, description) {
 
 
   document.getElementById('reportId').value = reportId;
+  const titleText = (typeof description === 'string' && description) ? description : (report.description || '');
   document.getElementById('resolveReportTitle').textContent =
-    description.substring(0, 60) + (description.length > 60 ? '...' : '');
+    titleText.substring(0, 60) + (titleText.length > 60 ? '...' : '');
   document.getElementById('resolveReportDescription').textContent =
     report.description || 'Sin descripción';
 
@@ -512,10 +592,10 @@ window.openResolveModal = function (reportId, description) {
 window.closeResolveModal = function() {
    const modal = document.getElementById('resolveModal');
   modal.classList.remove('modal-open');
-
+ 
   setTimeout(() => {
     modal.classList.add('hidden');
-  }, 300);
+  }, 350);
 }
   const reportsDataElement = document.getElementById('reportsData');
   const allReports = reportsDataElement ? JSON.parse(reportsDataElement.dataset.reports) : [];
@@ -524,8 +604,9 @@ window.closeResolveModal = function() {
 
   const userDataElement = document.getElementById('userData');
   const user = userDataElement ? {
-    role: userDataElement.dataset.role
-  } : { role: 'user' };
+    role: userDataElement.dataset.role,
+    userId: parseInt(userDataElement.dataset.userId) || 0
+  } : { role: 'user', userId: 0};
 
   function initializeFilters() {
   
@@ -581,69 +662,121 @@ window.closeResolveModal = function() {
         return;
       }
 
-      let html = '';
-      filteredReports.forEach(report => {
-        const description = report.description || 'Sin descripción';
-        const safeDescription = description.replace(/"/g, '&quot;').replace(/'/g, "\\'");
-        const userCanResolve = (user.role === 'tecnico' || user.role === 'superadmin') && report.status !== 'resuelto';
-        
-        html += `
-          <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
-            <div class="p-6">
-              <div class="flex justify-between items-start mb-4">
-                <div>
-                  <h3 class="text-xl font-semibold text-gray-900 mb-1">
-                    ${description.substring(0, 60)}${description.length > 60 ? '...' : ''}
-                  </h3>
-                  <div class="flex items-center space-x-3">
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                      Aula ${report.classroom}
-                    </span>
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getProblemTypeClass(report.problem_type)}">
-                      ${getProblemTypeText(report.problem_type)}
-                    </span>
-                  </div>
-                </div>
-                
-                <div class="flex flex-col items-end space-y-2">
-                  <span class="px-3 py-1 rounded-full text-sm font-medium ${getPriorityClass(report.priority)}">
-                    ${getPriorityText(report.priority)}
-                  </span>
-                  <span class="px-3 py-1 rounded-full text-sm font-medium ${getStatusClass(report.status)}">
-                    ${getStatusText(report.status)}
-                  </span>
-                </div>
+  let html = '';
+  filteredReports.forEach(report => {
+    const description = report.description || 'Sin descripción';
+    const safeDescription = description.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+    
+    // Determinar permisos en JavaScript
+    const isReportAssignedToCurrentUser = user.userId === report.assigned_to;
+    const canReassign = (user.role === 'superadmin' || 
+                        (user.role === 'tecnico' && isReportAssignedToCurrentUser)) &&
+                       report.status === 'pendiente';
+    const userCanResolve = (user.role === 'tecnico' || user.role === 'superadmin') && report.status !== 'resuelto';
+    
+    html += `
+      <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+        <div class="p-6">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h3 class="text-xl font-semibold text-gray-900 mb-1">
+                ${description.substring(0, 60)}${description.length > 60 ? '...' : ''}
+              </h3>
+              <div class="flex items-center space-x-3">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                  Aula ${report.classroom}
+                </span>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getProblemTypeClass(report.problem_type)}">
+                  ${getProblemTypeText(report.problem_type)}
+                </span>
               </div>
+            </div>
+            
+            <div class="flex flex-col items-end space-y-2">
+              <span class="px-3 py-1 rounded-full text-sm font-medium ${getPriorityClass(report.priority)}">
+                ${getPriorityText(report.priority)}
+              </span>
+              <span class="px-3 py-1 rounded-full text-sm font-medium ${getStatusClass(report.status)}">
+                ${getStatusText(report.status)}
+              </span>
+            </div>
+          </div>
 
-              <p class="text-gray-700 mb-4">${description}</p>
+          <p class="text-gray-700 mb-4">${description}</p>
 
-              <div class="flex justify-between items-center pt-4 border-t border-gray-100">
-                <div class="text-sm text-gray-500 flex items-center space-x-2">
-                  <p>Creado por: <span class="font-medium">${report.created_by_name || 'Usuario'}</span> -</p>
-                  <p>${new Date(report.created_at).toLocaleDateString('es-ES', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}</p>
+          <!-- Información del reporte -->
+          <div class="mb-4 flex items-center justify-between">
+            <div class="flex items-center gap-x-4 text-sm text-gray-600">
+              <!-- Creado por -->
+              <div class="flex items-center gap-x-1">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span class="font-medium">Creado por:</span>
+                <span>${report.created_by_name || 'Usuario'}</span>
+              </div>
+              
+              <!-- Técnico asignado -->
+              ${report.assigned_to_name ? `
+                <div class="flex items-center gap-x-1">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span class="font-medium">Técnico:</span>
+                  <span class="font-semibold text-gray-900">${report.assigned_to_name}</span>
                 </div>
-
-                ${userCanResolve ? `
-                  <button
-                    onclick="window.openResolveModal(${report.id}, '${safeDescription}')"
-                    class="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors flex items-center gap-x-2 cursor-pointer"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-icon lucide-circle-check"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-                    Resolver
-                  </button>
-                ` : ''}
+              ` : ''}
+              
+              <!-- Fecha -->
+              <div class="flex items-center gap-x-1">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>${new Date(report.created_at).toLocaleDateString('es-ES', { 
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                })}</span>
               </div>
             </div>
           </div>
-        `;
-      });
 
-      reportsContainer.innerHTML = html;
-    }
+          <!-- Botones de acción -->
+          ${(canReassign || userCanResolve) ? `
+            <div class="flex justify-end gap-x-2 pt-4 border-t border-gray-100">
+              ${canReassign ? `
+                <button
+                  onclick="window.openReassignModal(${report.id}, ${report.assigned_to || 0}, '${(report.assigned_to_name || '').replace(/'/g, "\\'")}')"
+                  class="px-4 py-2 flex items-center gap-x-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors cursor-pointer"
+                >
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  Reasignar
+                </button>
+              ` : ''}
+              
+              ${userCanResolve ? `
+                <button
+                  onclick="window.openResolveModal(${report.id})"
+                  class="px-4 py-2 flex items-center gap-x-2 bg-black text-white rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="m9 12 2 2 4-4"/>
+                  </svg>
+                  Resolver
+                </button>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  });
+
+  reportsContainer.innerHTML = html;
+}
 
   
     function getProblemTypeClass(type) {

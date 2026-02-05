@@ -151,10 +151,13 @@ export const GET: APIRoute = async ({ cookies, url }) => {
             r.status, r.priority, r.sector, r.created_at, 
             r.created_by, r.assigned_to, r.resolved_at, r.resolved_by, r.resolution_notes,
             u.full_name as created_by_name,
-            u_resolved.full_name as resolved_by_name
+            u_resolved.full_name as resolved_by_name,
+            u_assigned.full_name as assigned_to_name,
+            u_assigned.id as assigned_to_id
             FROM reports r
             JOIN users u ON r.created_by = u.id
             LEFT JOIN users u_resolved ON r.resolved_by = u_resolved.id
+            LEFT JOIN users u_assigned ON r.assigned_to = u_assigned.id
         `;
 
         let conditions: string[] = [];
@@ -384,5 +387,134 @@ export const PATCH: APIRoute = async ({ request, cookies }) => {
             { status: 500 }
         );
     }
+};
+
+export const PUT: APIRoute = async ({ request, cookies }) => {
+  try {
+    const token = cookies.get('session_token')?.value;
+    const currentUser = await getUserFromToken(token || '');
+    
+    if (!currentUser) {
+      return new Response(
+        JSON.stringify({ message: 'No autorizado' }),
+        { status: 401 }
+      );
+    }
+
+    const data = await request.json();
+    const reportId = data.reportId;
+    const newTechnicianId = data.newTechnicianId;
+
+    // Validar datos
+    if (!reportId || !newTechnicianId) {
+      return new Response(
+        JSON.stringify({ message: 'Datos incompletos' }),
+        { status: 400 }
+      );
+    }
+
+    // Obtener el reporte actual
+    const [reportRows] = await pool.query<mysql.RowDataPacket[]>(
+      `SELECT r.*, 
+              u_tech.full_name as assigned_to_name,
+              u_creator.full_name as created_by_name
+       FROM reports r
+       LEFT JOIN users u_tech ON r.assigned_to = u_tech.id
+       JOIN users u_creator ON r.created_by = u_creator.id
+       WHERE r.id = ?`,
+      [reportId]
+    );
+
+    if (reportRows.length === 0) {
+      return new Response(
+        JSON.stringify({ message: 'Reporte no encontrado' }),
+        { status: 404 }
+      );
+    }
+
+    const report = reportRows[0];
+
+    // Validar que el reporte este pendiente
+    if (report.status !== 'pendiente') {
+      return new Response(
+        JSON.stringify({ message: 'Solo se pueden reasignar reportes pendientes'}),
+        { status: 400 }
+      );
+    }
+
+    // Validar permisos
+    if (currentUser.role === 'tecnico') {
+      // Técnico solo puede reasignar reportes asignados a él
+      if (report.assigned_to !== currentUser.userId) {
+        return new Response(
+          JSON.stringify({ message: 'No tienes permiso para reasignar este reporte' }),
+          { status: 403 }
+        );
+      }
+    }
+    // Superadmin puede reasignar cualquier reporte
+    // Verificar que el nuevo técnico existe y es técnico
+    const [newTechRows] = await pool.query<mysql.RowDataPacket[]>(
+      `SELECT id, full_name FROM users 
+       WHERE id = ? AND role = 'tecnico' AND is_active = 1`,
+      [newTechnicianId]
+    );
+
+    if (newTechRows.length === 0) {
+      return new Response(
+        JSON.stringify({ message: 'El técnico seleccionado no es válido' }),
+        { status: 400 }
+      );
+    }
+
+    // Realizar la reasignación
+    await pool.query(
+      `UPDATE reports 
+       SET assigned_to = ?, 
+           previous_technician_id = ?,
+           reassigned_at = NOW(),
+           updated_at = NOW()
+       WHERE id = ?`,
+      [newTechnicianId, report.assigned_to, reportId]
+    );
+
+    // Registrar en el historial
+    try {
+      await pool.query(
+        `INSERT INTO report_history 
+         (report_id, action, old_value, new_value, user_id, details) 
+         VALUES (?, 'reassign', ?, ?, ?, ?)`,
+        [
+          reportId,
+          report.assigned_to,
+          newTechnicianId,
+          currentUser.userId,
+          JSON.stringify({
+            old_technician: report.assigned_to_name,
+            new_technician: newTechRows[0].full_name,
+            reassigned_by: currentUser.fullName || currentUser.username
+          })
+        ]
+      );
+    } catch (historyErr) {
+      console.log('No se pudo registrar en historial:', historyErr);
+      // Continuar aunque falle el historial
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        message: 'Reporte reasignado exitosamente',
+        newTechnician: newTechRows[0].full_name
+      }),
+      { status: 200 }
+    );
+
+  } catch (err) {
+    console.error('Error en reasignación:', err);
+    return new Response(
+      JSON.stringify({ message: 'Error del servidor' }),
+      { status: 500 }
+    );
+  }
 };
 
