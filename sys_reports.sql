@@ -221,9 +221,22 @@ ALTER TABLE `user_sessions`
   ADD CONSTRAINT `user_sessions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 COMMIT;
 
+
+-- Agregar columnas para resolución de reportes en la tabla reports
+ALTER TABLE reports
+  ADD COLUMN resolved_at DATETIME NULL AFTER priority,
+  ADD COLUMN resolved_by INT(11) NULL AFTER resolved_at,
+  ADD COLUMN resolution_notes TEXT NULL AFTER resolved_by,
+  ADD COLUMN updated_at TIMESTAMP NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP 
+    ON UPDATE CURRENT_TIMESTAMP 
+    AFTER resolution_notes;
+
+
 -- Agregar columna assigned_to a la tabla reports
 ALTER TABLE reports
 ADD COLUMN assigned_to INT NULL AFTER created_by;
+
 -- Agregar clave foránea para assigned_to en la tabla reports
 ALTER TABLE reports
 ADD CONSTRAINT fk_reports_assigned_to
