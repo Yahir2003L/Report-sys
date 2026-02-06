@@ -221,6 +221,15 @@ ALTER TABLE `user_sessions`
   ADD CONSTRAINT `user_sessions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 COMMIT;
 
+-- Agregar columna assigned_to a la tabla reports
+ALTER TABLE reports
+ADD COLUMN assigned_to INT NULL AFTER created_by;
+-- Agregar clave foránea para assigned_to en la tabla reports
+ALTER TABLE reports
+ADD CONSTRAINT fk_reports_assigned_to
+FOREIGN KEY (assigned_to) REFERENCES users(id)
+ON DELETE SET NULL;
+
 -- Agregar columnas para seguimiento de reasignaciones en la tabla reports
 ALTER TABLE reports 
 ADD COLUMN previous_technician_id INT NULL,
